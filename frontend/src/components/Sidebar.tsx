@@ -65,9 +65,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuClick }) => {
 
           {/* 项目管理 */}
           <Menu.SubMenu key="/projects" icon={<ProjectOutlined />} title="项目管理">
-            <Menu.Item key="/projects/list" icon={<UnorderedListOutlined />}>
-              <Link to="/projects/list">项目列表</Link>
-            </Menu.Item>
             <Menu.Item key="/projects/create" icon={<PlusOutlined />}>
               <Link to="/projects/create">创建项目</Link>
             </Menu.Item>
@@ -81,8 +78,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuClick }) => {
             <Menu.Item key="/tasks/my" icon={<UserOutlined />}>
               <Link to="/tasks/my">我的任务</Link>
             </Menu.Item>
-            <Menu.Item key="/tasks/assigned" icon={<UnorderedListOutlined />}>
-              <Link to="/tasks/assigned">已指派任务</Link>
+            <Menu.Item key="/tasks/projects" icon={<ProjectOutlined />}>
+              <Link to="/tasks/projects">我的项目</Link>
             </Menu.Item>
             <Menu.Item key="/tasks/private" icon={<BookOutlined />}>
               <Link to="/tasks/private">私有任务</Link>
@@ -122,4 +119,4 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuClick }) => {
   );
 };
 
-export default Sidebar; 
+export default Sidebar;
