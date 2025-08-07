@@ -3,6 +3,33 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Breadcrumb, Tabs, Avatar, Dropdown, Space } from "antd";
 import { UserOutlined, SettingOutlined, LogoutOutlined, TranslationOutlined, FullscreenOutlined, FullscreenExitOutlined } from "@ant-design/icons";
 import { useState, useCallback, useEffect } from "react";
+import { routes } from '../routes';
+import type { RouteConfig } from '../routes';
+
+function findRouteByPath(path: string, routes: RouteConfig[]): RouteConfig | undefined {
+  for (const route of routes) {
+    if (route.path === path) return route;
+    if (route.children) {
+      const found = findRouteByPath(path, route.children);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+function getBreadcrumbItems(pathname: string) {
+  const segments = pathname.split('/').filter(Boolean);
+  const items = [{ title: '首页' }];
+  let currentPath = '';
+  for (const segment of segments) {
+    currentPath += `/${segment}`;
+    const route = findRouteByPath(currentPath, routes);
+    if (route) {
+      items.push({ title: route.label });
+    }
+  }
+  return items;
+}
 
 export default function MainLayout() {
   const location = useLocation();
@@ -88,31 +115,6 @@ export default function MainLayout() {
     }
   };
 
-  // 面包屑配置
-  const getBreadcrumbItems = () => {
-    const pathMap: { [key: string]: string } = {
-      "/": "首页",
-      "/users": "系统用户",
-      "/users/list": "用户管理",
-      "/products": "产品管理",
-      "/orders": "订单管理",
-      "/messages": "消息中心",
-    };
-
-    const paths = location.pathname.split("/").filter(Boolean);
-    const items = [{ title: "首页" }];
-
-    let currentPath = "";
-    paths.forEach((path) => {
-      currentPath += `/${path}`;
-      if (pathMap[currentPath]) {
-        items.push({ title: pathMap[currentPath] });
-      }
-    });
-
-    return items;
-  };
-
   // 用户下拉菜单
   const userMenuItems = [
     {
@@ -173,7 +175,7 @@ export default function MainLayout() {
           <div className="flex items-center justify-between">
             {/* 左侧面包屑 */}
             <div className="flex-1">
-              <Breadcrumb items={getBreadcrumbItems()} />
+              <Breadcrumb items={getBreadcrumbItems(location.pathname)} />
             </div>
             
             {/* 右侧用户信息和操作 */}
