@@ -13,6 +13,7 @@
     @apply transition-all duration-300;
   }
   
+
   .card-transition:hover {
     @apply shadow-lg -translate-y-1;
   }
