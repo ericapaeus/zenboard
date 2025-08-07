@@ -108,6 +108,17 @@ export default function Login() {
     };
   }, [qrData?.key, navigate]);
 
+  // 点击二维码直接登录（开发测试用）
+  const handleQRCodeClick = () => {
+    if (qrData && !isExpired) {
+      console.log("开发模式：点击二维码直接登录");
+      localStorage.setItem("isLogin", "1");
+      localStorage.setItem("access_token", "dev_token_" + Date.now());
+      message.success("开发模式：直接登录成功！");
+      navigate("/");
+    }
+  };
+
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
@@ -141,7 +152,13 @@ export default function Login() {
           <div className="relative inline-block">
             <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-gray-100">
               {qrData && typeof qrData.url === 'string' && qrData.url.length > 0 ? (
-                <QRCode value={qrData.url} size={192} />
+                <div 
+                  onClick={handleQRCodeClick}
+                  className="cursor-pointer hover:opacity-80 transition-opacity"
+                  title="开发模式：点击直接登录"
+                >
+                  <QRCode value={qrData.url} size={192} />
+                </div>
               ) : (
                 <div className="w-48 h-48 flex items-center justify-center bg-gray-100 rounded-lg">
                   <Spin size="large" />
@@ -167,6 +184,7 @@ export default function Login() {
 
           <div className="mt-4 space-y-2">
             <p className="text-gray-600 text-sm">使用手机扫描二维码登录</p>
+            <p className="text-blue-500 text-xs">💡 开发模式：点击二维码可直接登录</p>
             <button
               onClick={refreshQRCode}
               disabled={isLoading || polling || isRefreshing}
