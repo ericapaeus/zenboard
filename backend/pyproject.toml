@@ -1,7 +1,7 @@
 [project]
-name = "backend"
+name = "zenboard"
 version = "0.1.0"
-description = "Add your description here"
+description = "Zenith - 极简团队协作系统后端"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,7 +13,17 @@ dependencies = [
     "python-jose>=3.5.0",
     "sqlalchemy>=2.0.42",
     "uvicorn[standard]>=0.35.0",
+    "alembic>=1.16.1",
+    "httpx>=0.28.1",
+    "pytz>=2025.2",
+    "passlib>=1.7.4",
+    "bcrypt>=4.0.1",
+    "python-multipart>=0.0.6",
+    "email-validator>=2.1.0",
 ]
+
+[tool.uv]
+python-downloads = "never"
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
