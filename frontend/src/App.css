@@ -1,0 +1,349 @@
+/* 导入 FontAwesome */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+/* 自定义样式 */
+@layer components {
+  /* 侧边栏激活状态 */
+  .sidebar-item-active {
+    @apply bg-blue-50 text-blue-600 border-l-4 border-blue-600;
+  }
+
+  /* 卡片悬停效果 */
+  .card-transition {
+    @apply transition-all duration-300;
+  }
+  
+  .card-transition:hover {
+    @apply shadow-lg -translate-y-1;
+  }
+
+  /* 按钮样式 */
+  .btn-primary {
+    @apply bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-all duration-200 flex items-center justify-center gap-2;
+  }
+
+  .btn-outline {
+    @apply border border-gray-200 text-gray-600 px-4 py-2 rounded-md hover:bg-gray-50 transition-all duration-200 flex items-center justify-center gap-2;
+  }
+
+  /* 输入框样式 */
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all duration-200;
+  }
+
+  /* 徽章样式 */
+  .badge {
+    @apply px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply bg-green-100 text-green-600;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-600;
+  }
+
+  .badge-info {
+    @apply bg-blue-100 text-blue-600;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-600;
+  }
+
+  /* 进度条样式 */
+  .progress-bar {
+    @apply w-full bg-gray-200 rounded-full h-2;
+  }
+
+  .progress-fill {
+    @apply bg-blue-600 h-2 rounded-full transition-all duration-300;
+  }
+
+  /* 表格样式 */
+  .table-container {
+    @apply overflow-x-auto;
+  }
+
+  .table {
+    @apply w-full;
+  }
+
+  .table th {
+    @apply text-left text-gray-500 text-sm border-b border-gray-200 pb-3 font-medium;
+  }
+
+  .table td {
+    @apply py-4;
+  }
+
+  .table tr {
+    @apply border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200;
+  }
+
+  /* 任务项样式 */
+  .task-item {
+    @apply flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200;
+  }
+
+  .task-checkbox {
+    @apply mt-1 h-4 w-4 text-blue-600 rounded border-gray-200 focus:ring-blue-500;
+  }
+
+  /* 活动项样式 */
+  .activity-item {
+    @apply flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200;
+  }
+
+  .activity-avatar {
+    @apply w-10 h-10 rounded-full object-cover;
+  }
+
+  /* 项目进度样式 */
+  .project-item {
+    @apply mb-6;
+  }
+
+  .project-header {
+    @apply flex items-center justify-between mb-2;
+  }
+
+  .project-progress {
+    @apply w-full bg-gray-200 rounded-full h-2 mb-1;
+  }
+
+  .project-fill {
+    @apply h-2 rounded-full transition-all duration-300;
+  }
+
+  /* 通知点样式 */
+  .notification-dot {
+    @apply absolute top-1 right-1 w-2 h-2 rounded-full;
+  }
+
+  .notification-dot-red {
+    @apply bg-red-500;
+  }
+
+  .notification-dot-blue {
+    @apply bg-blue-600;
+  }
+
+  /* 用户头像样式 */
+  .user-avatar {
+    @apply w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm;
+  }
+
+  /* 搜索框样式 */
+  .search-container {
+    @apply relative hidden md:block;
+  }
+
+  .search-input {
+    @apply input-field pl-10 w-64;
+  }
+
+  .search-icon {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 text-gray-400;
+  }
+
+  /* 存储空间样式 */
+  .storage-section {
+    @apply bg-gray-100 rounded-lg p-4;
+  }
+
+  .storage-progress {
+    @apply w-full bg-white rounded-full h-2 mb-2;
+  }
+
+  .storage-fill {
+    @apply bg-blue-600 h-2 rounded-full;
+  }
+
+  /* 数据卡片样式 */
+  .data-card {
+    @apply bg-white rounded-xl shadow p-5 card-transition;
+  }
+
+  .data-card-icon {
+    @apply w-12 h-12 rounded-lg flex items-center justify-center text-xl;
+  }
+
+  .data-card-icon-blue {
+    @apply bg-blue-100 text-blue-600;
+  }
+
+  .data-card-icon-green {
+    @apply bg-green-100 text-green-600;
+  }
+
+  .data-card-icon-yellow {
+    @apply bg-yellow-100 text-yellow-600;
+  }
+
+  /* 趋势指标样式 */
+  .trend-up {
+    @apply text-green-600;
+  }
+
+  .trend-down {
+    @apply text-red-500;
+  }
+
+  /* 响应式设计 */
+  @media (max-width: 768px) {
+    .sidebar {
+      @apply transform -translate-x-full;
+    }
+
+    .sidebar.open {
+      @apply transform translate-x-0;
+    }
+
+    .main-content {
+      @apply ml-0;
+    }
+
+    .header {
+      @apply left-0;
+    }
+  }
+
+  /* 动画效果 */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  /* 滚动条样式 */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+  }
+
+  /* 焦点样式 */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:ring-offset-2;
+  }
+
+  /* 加载状态 */
+  .loading {
+    @apply animate-pulse;
+  }
+
+  /* 错误状态 */
+  .error {
+    @apply text-red-500;
+  }
+
+  /* 成功状态 */
+  .success {
+    @apply text-green-600;
+  }
+
+  /* 警告状态 */
+  .warning {
+    @apply text-yellow-600;
+  }
+
+  /* 信息状态 */
+  .info {
+    @apply text-blue-600;
+  }
+
+  .custom-tabs .ant-tabs-nav {
+    background: transparent;
+    border-bottom: 1px solid #f0f0f0;
+    box-shadow: none;
+    padding: 0 0 0 8px;
+    min-height: 36px;
+  }
+  .custom-tabs .ant-tabs-tab {
+    background: transparent;
+    border-radius: 0;
+    margin-right: 16px !important;
+    padding: 0 12px !important;
+    font-size: 15px;
+    color: #1d2129;
+    min-height: 32px;
+    line-height: 32px;
+    transition: color 0.2s, background 0.2s;
+  }
+  .custom-tabs .ant-tabs-tab-active {
+    color: #165dff !important;
+    background: transparent !important;
+    font-weight: 600;
+    border-bottom: 2px solid #165dff;
+  }
+  .custom-tabs .ant-tabs-tab:not(.ant-tabs-tab-active):hover {
+    color: #165dff;
+    background: #f5f7fa;
+  }
+  .custom-tabs .ant-tabs-tab-remove {
+    margin-left: 4px;
+    color: #bbb;
+    font-size: 12px;
+    transition: color 0.2s;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .custom-tabs .ant-tabs-tab-remove:hover {
+    color: #ff4d4f;
+  }
+}
+
+/* 全局样式 */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 确保图标正确显示 */
+.fas, .far, .fab {
+  font-family: 'Font Awesome 6 Free', 'Font Awesome 6 Brands';
+}
+
+.fas {
+  font-weight: 900;
+}
+
+.far {
+  font-weight: 400;
+}
+
+.fab {
+  font-family: 'Font Awesome 6 Brands';
+  font-weight: 400;
+}
