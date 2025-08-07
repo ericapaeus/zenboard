@@ -15,10 +15,10 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
-# WeChat Configuration
-WECHAT_APP_ID = os.getenv("WECHAT_APP_ID", "your-wechat-app-id")
-WECHAT_APP_SECRET = os.getenv("WECHAT_APP_SECRET", "your-wechat-app-secret")
-WECHAT_REDIRECT_URI = os.getenv("WECHAT_REDIRECT_URI", "http://localhost:8000/api/auth/wechat/callback")
+# WeChat Proxy Configuration (参考datagentic项目)
+AUTH_API_KEY = os.getenv("AUTH_API_KEY", "your-auth-api-key")
+AUTH_API_BASE_URL = os.getenv("AUTH_API_BASE_URL", "https://your-auth-service.com")
+
 
 # QR Code Configuration
 QR_CODE_EXPIRE_MINUTES = int(os.getenv("QR_CODE_EXPIRE_MINUTES", "5"))

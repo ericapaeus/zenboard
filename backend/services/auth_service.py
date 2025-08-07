@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Union
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -18,8 +18,10 @@ security = HTTPBearer()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class AuthService:
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self):
+        self.secret_key = SECRET_KEY
+        self.algorithm = ALGORITHM
+        self.access_token_expire_minutes = ACCESS_TOKEN_EXPIRE_MINUTES
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """验证密码"""
@@ -35,14 +37,43 @@ class AuthService:
         if expires_delta:
             expire = datetime.utcnow() + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            expire = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
         to_encode.update({"exp": expire})
-        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
         return encoded_jwt
 
-    async def authenticate_user(self, username: str, password: str) -> Token:
+    def verify_token(self, token: str) -> Optional[dict]:
+        """验证令牌"""
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            return payload
+        except JWTError:
+            return None
+
+    def get_user_by_openid(self, db: Session, openid: str) -> Optional[User]:
+        """通过openid获取用户"""
+        return db.query(User).filter(User.openid == openid).first()
+
+    def get_or_create_user_by_openid(self, db: Session, openid: str, name: Optional[str] = None) -> Optional[User]:
+        """通过openid获取或创建用户"""
+        user = self.get_user_by_openid(db, openid)
+        if user:
+            return user
+        
+        # 创建新用户
+        user = User(
+            nickname=name or "微信用户",
+            openid=openid,
+            status="active"  # 微信登录默认激活
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    async def authenticate_user(self, username: str, password: str, db: Session) -> Token:
         """用户认证"""
-        user = self.db.query(User).filter(User.username == username).first()
+        user = db.query(User).filter(User.username == username).first()
         if not user or not self.verify_password(password, user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -93,20 +124,20 @@ class AuthService:
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )
 
-    async def refresh_token(self, token: str) -> Token:
+    def refresh_access_token(self, refresh_token: str) -> dict:
         """刷新访问令牌"""
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(refresh_token, self.secret_key, algorithms=[self.algorithm])
             user_id: str = payload.get("sub")
             if user_id is None:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="无效的令牌"
+                    detail="无效的刷新令牌"
                 )
         except JWTError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="无效的令牌"
+                detail="无效的刷新令牌"
             )
         
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -114,14 +145,14 @@ class AuthService:
             data={"sub": user_id}, expires_delta=access_token_expires
         )
         
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
-        )
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        }
 
-    @staticmethod
     async def get_current_user(
+        self,
         credentials: HTTPAuthorizationCredentials = Depends(security),
         db: Session = Depends(lambda: None)  # 这里需要注入db
     ) -> User:
@@ -133,7 +164,7 @@ class AuthService:
         )
         
         try:
-            payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(credentials.credentials, self.secret_key, algorithms=[self.algorithm])
             user_id: str = payload.get("sub")
             if user_id is None:
                 raise credentials_exception

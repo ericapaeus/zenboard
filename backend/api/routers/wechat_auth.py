@@ -1,166 +1,173 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, status
+import httpx
+import os
+from config import AUTH_API_KEY, AUTH_API_BASE_URL
 from sqlalchemy.orm import Session
-from typing import Optional
 from database.database import get_db
-from services.wechat_service import WeChatService
 from services.auth_service import AuthService
 from api.schemas.response import ApiResponse
-from api.schemas.wechat import WeChatQRResponse, WeChatStatusResponse, WeChatTokenResponse
+from api.schemas.wechat_proxy import WechatAuthData, RefreshTokenRequest
+from api.schemas.user import UserResponse
 
 router = APIRouter()
-wechat_service = WeChatService()
-auth_service = AuthService()
 
+# 确保AUTH_API_KEY和AUTH_API_BASE_URL已配置
+if not AUTH_API_KEY or not AUTH_API_BASE_URL:
+    raise ValueError("AUTH_API_KEY and AUTH_API_BASE_URL must be set in environment variables.")
 
-@router.post("/generate", response_model=ApiResponse[WeChatQRResponse])
-async def generate_wechat_qr(db: Session = Depends(get_db)):
+@router.post("/generate", response_model=ApiResponse[WechatAuthData], summary="生成微信登录凭据")
+async def generate_wechat_login_credentials(redirect: str | None = Query(None)):
     """
-    生成微信登录二维码
+    获取微信登录凭据（包含登录 URL 和会话 Key）。
     """
+    api_url = f"{AUTH_API_BASE_URL}/auth/generate"
+
+    headers = {"x-api-key": AUTH_API_KEY}
+    payload = {}
+    if redirect:
+        payload["redirect"] = redirect
+
+    print("==============")
     try:
-        # 生成会话ID
-        session_id = wechat_service.generate_session_id()
-        
-        # 创建登录会话
-        login_session = wechat_service.create_login_session(db, session_id)
-        
-        # 生成二维码URL
-        qr_url = wechat_service.generate_qr_url(session_id)
-        
-        return ApiResponse(
-            success=True,
-            message="二维码生成成功",
-            data=WeChatQRResponse(
-                session_id=session_id,
-                qr_url=qr_url,
-                expires_in=300  # 5分钟过期
+        async with httpx.AsyncClient() as client:
+            response = await client.post(api_url, headers=headers, json=payload)
+            response.raise_for_status()
+            response_data = response.json()
+            return ApiResponse(
+                success=response_data.get("success", True),
+                message=response_data.get("message", "Success"),
+                data=WechatAuthData(**response_data.get("data", {})),
+                code=response_data.get("code", 200)
             )
-        )
+    except httpx.HTTPStatusError as e:
+        return ApiResponse(code=e.response.status_code, success=False, message=f"上游API返回错误: {e.response.text}")
+    except httpx.RequestError as e:
+        return ApiResponse(code=500, success=False, message=f"请求上游API失败: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"生成二维码失败: {str(e)}")
+        return ApiResponse(code=500, success=False, message=f"生成微信登录凭据失败: {str(e)}")
 
 
-@router.get("/callback")
-async def wechat_callback(
-    code: str = Query(..., description="微信授权码"),
-    state: str = Query(..., description="会话ID"),
+@router.get("/status/{key}", response_model=ApiResponse[WechatAuthData], summary="检查微信扫码登录状态")
+async def get_wechat_login_status(key: str):
+    """
+    检查用户扫码登录状态。
+    """
+    api_url = f"{AUTH_API_BASE_URL}/auth/status/{key}"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(api_url)
+            response.raise_for_status()
+            response_data = response.json()
+            return ApiResponse(
+                success=response_data.get("success", True),
+                message=response_data.get("message", "Success"),
+                data=WechatAuthData(**response_data.get("data", {})),
+                code=response_data.get("code", 200)
+            )
+    except httpx.HTTPStatusError as e:
+        return ApiResponse(code=e.response.status_code, success=False, message=f"上游API返回错误: {e.response.text}")
+    except httpx.RequestError as e:
+        return ApiResponse(code=500, success=False, message=f"请求上游API失败: {e}")
+    except Exception as e:
+        return ApiResponse(code=500, success=False, message=f"检查登录状态失败: {str(e)}")
+
+
+@router.get("/openid", response_model=ApiResponse[WechatAuthData], summary="凭 code 获取用户 OpenID")
+async def get_wechat_openid(
+    code: str = Query(...), 
     db: Session = Depends(get_db)
 ):
     """
-    微信回调接口 - 用户扫码后微信会调用此接口
+    凭 code 获取用户 openid。
     """
-    try:
-        # 通过code获取access_token
-        token_info = await wechat_service.get_access_token(code)
-        if not token_info or "errcode" in token_info:
-            raise HTTPException(status_code=400, detail="获取微信token失败")
-        
-        # 获取用户信息
-        user_info = await wechat_service.get_user_info(
-            token_info["access_token"], 
-            token_info["openid"]
-        )
-        if not user_info or "errcode" in user_info:
-            raise HTTPException(status_code=400, detail="获取微信用户信息失败")
-        
-        # 获取或创建用户
-        user = wechat_service.get_or_create_user(db, user_info)
-        
-        # 更新登录会话状态
-        wechat_service.update_session_status(db, state, "used", user.id)
-        
-        # 返回成功页面
-        return """
-        <html>
-        <head><title>登录成功</title></head>
-        <body>
-            <h1>登录成功！</h1>
-            <p>请回到PC端继续操作。</p>
-            <script>
-                setTimeout(function() {
-                    window.close();
-                }, 2000);
-            </script>
-        </body>
-        </html>
-        """
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"微信登录失败: {str(e)}")
+    api_url = f"{AUTH_API_BASE_URL}/auth/openid"
+    headers = {"x-api-key": AUTH_API_KEY}
+    params = {"code": code}
 
-
-@router.get("/status", response_model=ApiResponse[WeChatStatusResponse])
-async def check_login_status(
-    session_id: str = Query(..., description="会话ID"),
-    db: Session = Depends(get_db)
-):
-    """
-    检查登录状态 - 前端轮询此接口
-    """
     try:
-        session = wechat_service.get_login_session(db, session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="会话不存在")
-        
-        if session.status == "used" and session.user_id:
-            # 登录成功，生成token
-            token = auth_service.create_access_token(data={"sub": str(session.user_id)})
-            return ApiResponse(
-                success=True,
-                message="登录成功",
-                data=WeChatStatusResponse(
-                    status="success",
-                    token=token,
-                    user_id=session.user_id
-                )
-            )
-        elif session.status == "expired":
-            return ApiResponse(
-                success=False,
-                message="二维码已过期",
-                data=WeChatStatusResponse(status="expired")
-            )
-        else:
-            return ApiResponse(
-                success=True,
-                message="等待扫码",
-                data=WeChatStatusResponse(status="pending")
-            )
+        async with httpx.AsyncClient() as client:
+            response = await client.get(api_url, headers=headers, params=params)
+            response.raise_for_status()
             
-    except HTTPException:
-        raise
+            response_data = response.json()
+            openid = response_data.get("data", {}).get("openid")
+            name = response_data.get("data", {}).get("name")
+
+            if not openid:
+                return ApiResponse(code=400, success=False, message="未能从微信API获取到openid")
+
+            # 根据openid创建/获取用户，并生成JWT token
+            auth_service = AuthService()
+            user = auth_service.get_or_create_user_by_openid(db, openid, name)
+            if not user:
+                return ApiResponse(code=500, success=False, message="用户认证失败")
+
+            # 生成JWT token
+            token_data = auth_service.create_access_token(data={"sub": str(user.id)})
+            
+            # 将 token 信息添加到响应数据中
+            wechat_auth_data = WechatAuthData(**response_data.get("data", {}))
+            wechat_auth_data.access_token = token_data
+            wechat_auth_data.token_type = "bearer"
+            
+            return ApiResponse(
+                success=response_data.get("success", True),
+                message=response_data.get("message", "Success"),
+                data=wechat_auth_data,
+                code=response_data.get("code", 200)
+            )
+    except httpx.HTTPStatusError as e:
+        return ApiResponse(code=e.response.status_code, success=False, message=f"上游API返回错误: {e.response.text}")
+    except httpx.RequestError as e:
+        return ApiResponse(code=500, success=False, message=f"请求上游API失败: {e}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"检查登录状态失败: {str(e)}")
+        return ApiResponse(code=500, success=False, message=f"获取用户OpenID失败: {str(e)}")
 
 
-@router.post("/token", response_model=ApiResponse[WeChatTokenResponse])
-async def get_login_token(
-    session_id: str = Query(..., description="会话ID"),
+@router.post("/refresh", response_model=ApiResponse[dict], summary="刷新令牌")
+async def refresh_token(
+    request: RefreshTokenRequest, 
     db: Session = Depends(get_db)
 ):
     """
-    获取登录token - 登录成功后调用
+    使用刷新令牌获取新的访问令牌和刷新令牌。
     """
     try:
-        session = wechat_service.get_login_session(db, session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="会话不存在")
-        
-        if session.status != "used" or not session.user_id:
-            raise HTTPException(status_code=400, detail="会话未完成登录")
-        
-        # 生成token
-        token = auth_service.create_access_token(data={"sub": str(session.user_id)})
-        
+        auth_service = AuthService()
+        token_data = auth_service.refresh_access_token(request.refresh_token)
         return ApiResponse(
             success=True,
-            message="获取token成功",
-            data=WeChatTokenResponse(token=token)
+            message="Token refreshed successfully",
+            data=token_data,
+            code=200
         )
-        
-    except HTTPException:
-        raise
+    except HTTPException as e:
+        return ApiResponse(code=e.status_code, success=False, message=e.detail)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取token失败: {str(e)}") 
+        return ApiResponse(code=500, success=False, message=f"刷新令牌失败: {e}")
+
+
+@router.get("/me", response_model=ApiResponse[UserResponse], summary="获取当前登录用户信息")
+async def read_users_me(
+    db: Session = Depends(get_db)
+):
+    """
+    获取当前登录用户信息。
+    """
+    # 这里需要实现获取当前用户的逻辑
+    # 暂时返回模拟数据
+    return ApiResponse(
+        success=True,
+        message="Success",
+        data=UserResponse(
+            id=1,
+            username="test_user",
+            email="test@example.com",
+            nickname="测试用户",
+            status="active",
+            created_at="2024-01-01T00:00:00",
+            updated_at="2024-01-01T00:00:00"
+        ),
+        code=200
+    ) 
