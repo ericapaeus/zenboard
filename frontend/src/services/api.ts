@@ -1,4 +1,5 @@
-import { api, ApiResponse } from '@/utils/api';
+import { api } from '@/utils/api';
+import type { ApiResponse } from '@/utils/api';
 
 // 类型定义
 export interface User {
@@ -67,7 +68,7 @@ export const authApi = {
     token_type: string;
     user: User;
   }>> => {
-    return api.post('/auth/login', { qr_code: qrCode }, { skipAuth: true });
+    return api.post('/api/auth/login', { qr_code: qrCode }, { skipAuth: true });
   },
 
   // 刷新 token
@@ -76,17 +77,17 @@ export const authApi = {
     refresh_token: string;
     token_type: string;
   }>> => {
-    return api.post('/auth/refresh', { refresh_token: refreshToken }, { skipAuth: true });
+    return api.post('/api/auth/refresh', { refresh_token: refreshToken }, { skipAuth: true });
   },
 
   // 退出登录
   logout: (): Promise<ApiResponse<null>> => {
-    return api.post('/auth/logout');
+    return api.post('/api/auth/logout');
   },
 
   // 获取当前用户信息
   getCurrentUser: (): Promise<ApiResponse<User>> => {
-    return api.get('/auth/me');
+    return api.get('/api/auth/me');
   },
 };
 
@@ -111,12 +112,12 @@ export const userApi = {
     if (params?.role) searchParams.append('role', params.role);
 
     const query = searchParams.toString();
-    return api.get(`/users${query ? `?${query}` : ''}`);
+    return api.get(`/api/users${query ? `?${query}` : ''}`);
   },
 
   // 获取单个用户
   getUser: (id: string): Promise<ApiResponse<User>> => {
-    return api.get(`/users/${id}`);
+    return api.get(`/api/users/${id}`);
   },
 
   // 创建用户
@@ -126,22 +127,22 @@ export const userApi = {
     phone: string;
     role: string;
   }): Promise<ApiResponse<User>> => {
-    return api.post('/users', userData);
+    return api.post('/api/users', userData);
   },
 
   // 更新用户
   updateUser: (id: string, userData: Partial<User>): Promise<ApiResponse<User>> => {
-    return api.put(`/users/${id}`, userData);
+    return api.put(`/api/users/${id}`, userData);
   },
 
   // 删除用户
   deleteUser: (id: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/users/${id}`);
+    return api.delete(`/api/users/${id}`);
   },
 
   // 更新用户状态
   updateUserStatus: (id: string, status: 'active' | 'inactive'): Promise<ApiResponse<User>> => {
-    return api.patch(`/users/${id}/status`, { status });
+    return api.patch(`/api/users/${id}/status`, { status });
   },
 };
 
@@ -149,22 +150,22 @@ export const userApi = {
 export const teamApi = {
   // 获取团队成员
   getMembers: (): Promise<ApiResponse<User[]>> => {
-    return api.get('/team/members');
+    return api.get('/api/team/members');
   },
 
   // 获取待审批用户
   getPendingApprovals: (): Promise<ApiResponse<User[]>> => {
-    return api.get('/team/approvals/pending');
+    return api.get('/api/team/approvals/pending');
   },
 
   // 审批用户
   approveUser: (userId: string, approved: boolean, reason?: string): Promise<ApiResponse<User>> => {
-    return api.post(`/team/approvals/${userId}`, { approved, reason });
+    return api.post(`/api/team/approvals/${userId}`, { approved, reason });
   },
 
   // 获取合同列表
   getContracts: (): Promise<ApiResponse<Contract[]>> => {
-    return api.get('/team/contracts');
+    return api.get('/api/team/contracts');
   },
 
   // 创建合同
@@ -173,17 +174,17 @@ export const teamApi = {
     hire_date: string;
     expire_date: string;
   }): Promise<ApiResponse<Contract>> => {
-    return api.post('/team/contracts', contractData);
+    return api.post('/api/team/contracts', contractData);
   },
 
   // 更新合同
   updateContract: (id: string, contractData: Partial<Contract>): Promise<ApiResponse<Contract>> => {
-    return api.put(`/team/contracts/${id}`, contractData);
+    return api.put(`/api/team/contracts/${id}`, contractData);
   },
 
   // 获取即将到期的合同
   getExpiringContracts: (days: number = 30): Promise<ApiResponse<Contract[]>> => {
-    return api.get(`/team/contracts/expiring?days=${days}`);
+    return api.get(`/api/team/contracts/expiring?days=${days}`);
   },
 };
 
@@ -191,12 +192,12 @@ export const teamApi = {
 export const projectApi = {
   // 获取项目列表
   getProjects: (): Promise<ApiResponse<Project[]>> => {
-    return api.get('/projects');
+    return api.get('/api/projects');
   },
 
   // 获取单个项目
   getProject: (id: string): Promise<ApiResponse<Project>> => {
-    return api.get(`/projects/${id}`);
+    return api.get(`/api/projects/${id}`);
   },
 
   // 创建项目
@@ -204,32 +205,32 @@ export const projectApi = {
     name: string;
     description: string;
   }): Promise<ApiResponse<Project>> => {
-    return api.post('/projects', projectData);
+    return api.post('/api/projects', projectData);
   },
 
   // 更新项目
   updateProject: (id: string, projectData: Partial<Project>): Promise<ApiResponse<Project>> => {
-    return api.put(`/projects/${id}`, projectData);
+    return api.put(`/api/projects/${id}`, projectData);
   },
 
   // 删除项目
   deleteProject: (id: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/projects/${id}`);
+    return api.delete(`/api/projects/${id}`);
   },
 
   // 获取项目成员
   getProjectMembers: (projectId: string): Promise<ApiResponse<User[]>> => {
-    return api.get(`/projects/${projectId}/members`);
+    return api.get(`/api/projects/${projectId}/members`);
   },
 
   // 添加项目成员
   addProjectMember: (projectId: string, userId: string): Promise<ApiResponse<null>> => {
-    return api.post(`/projects/${projectId}/members`, { user_id: userId });
+    return api.post(`/api/projects/${projectId}/members`, { user_id: userId });
   },
 
   // 移除项目成员
   removeProjectMember: (projectId: string, userId: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/projects/${projectId}/members/${userId}`);
+    return api.delete(`/api/projects/${projectId}/members/${userId}`);
   },
 
   // 获取团队公告板
@@ -237,7 +238,7 @@ export const projectApi = {
     projects: Project[];
     public_tasks: Task[];
   }>> => {
-    return api.get('/projects/board');
+    return api.get('/api/projects/board');
   },
 };
 
@@ -245,22 +246,22 @@ export const projectApi = {
 export const taskApi = {
   // 获取我的任务
   getMyTasks: (): Promise<ApiResponse<Task[]>> => {
-    return api.get('/tasks/my');
+    return api.get('/api/tasks/my');
   },
 
   // 获取已指派的任务
   getAssignedTasks: (): Promise<ApiResponse<Task[]>> => {
-    return api.get('/tasks/assigned');
+    return api.get('/api/tasks/assigned');
   },
 
   // 获取私有任务
   getPrivateTasks: (): Promise<ApiResponse<Task[]>> => {
-    return api.get('/tasks/private');
+    return api.get('/api/tasks/private');
   },
 
   // 获取项目任务
   getProjectTasks: (projectId: string): Promise<ApiResponse<Task[]>> => {
-    return api.get(`/projects/${projectId}/tasks`);
+    return api.get(`/api/projects/${projectId}/tasks`);
   },
 
   // 创建任务
@@ -272,27 +273,27 @@ export const taskApi = {
     project_id?: string;
     parent_task_id?: string;
   }): Promise<ApiResponse<Task>> => {
-    return api.post('/tasks', taskData);
+    return api.post('/api/tasks', taskData);
   },
 
   // 更新任务
   updateTask: (id: string, taskData: Partial<Task>): Promise<ApiResponse<Task>> => {
-    return api.put(`/tasks/${id}`, taskData);
+    return api.put(`/api/tasks/${id}`, taskData);
   },
 
   // 更新任务状态
   updateTaskStatus: (id: string, status: 'todo' | 'in_progress' | 'completed'): Promise<ApiResponse<Task>> => {
-    return api.patch(`/tasks/${id}/status`, { status });
+    return api.patch(`/api/tasks/${id}/status`, { status });
   },
 
   // 删除任务
   deleteTask: (id: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/tasks/${id}`);
+    return api.delete(`/api/tasks/${id}`);
   },
 
   // 获取子任务
   getSubTasks: (taskId: string): Promise<ApiResponse<Task[]>> => {
-    return api.get(`/tasks/${taskId}/subtasks`);
+    return api.get(`/api/tasks/${taskId}/subtasks`);
   },
 };
 
@@ -315,17 +316,17 @@ export const diaryApi = {
     if (params?.visibility) searchParams.append('visibility', params.visibility);
 
     const query = searchParams.toString();
-    return api.get(`/diaries/my${query ? `?${query}` : ''}`);
+    return api.get(`/api/diaries/my${query ? `?${query}` : ''}`);
   },
 
   // 获取共享日记
   getSharedDiaries: (): Promise<ApiResponse<Diary[]>> => {
-    return api.get('/diaries/shared');
+    return api.get('/api/diaries/shared');
   },
 
   // 获取单个日记
   getDiary: (id: string): Promise<ApiResponse<Diary>> => {
-    return api.get(`/diaries/${id}`);
+    return api.get(`/api/diaries/${id}`);
   },
 
   // 创建日记
@@ -336,17 +337,17 @@ export const diaryApi = {
     shared_with?: string[];
     project_id?: string;
   }): Promise<ApiResponse<Diary>> => {
-    return api.post('/diaries', diaryData);
+    return api.post('/api/diaries', diaryData);
   },
 
   // 更新日记
   updateDiary: (id: string, diaryData: Partial<Diary>): Promise<ApiResponse<Diary>> => {
-    return api.put(`/diaries/${id}`, diaryData);
+    return api.put(`/api/diaries/${id}`, diaryData);
   },
 
   // 删除日记
   deleteDiary: (id: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/diaries/${id}`);
+    return api.delete(`/api/diaries/${id}`);
   },
 
   // 分享日记
@@ -355,7 +356,7 @@ export const diaryApi = {
     shared_with?: string[];
     project_id?: string;
   }): Promise<ApiResponse<Diary>> => {
-    return api.post(`/diaries/${id}/share`, shareData);
+    return api.post(`/api/diaries/${id}/share`, shareData);
   },
 };
 
@@ -380,21 +381,36 @@ export const messageApi = {
     if (params?.read !== undefined) searchParams.append('read', params.read.toString());
 
     const query = searchParams.toString();
-    return api.get(`/messages${query ? `?${query}` : ''}`);
+    return api.get(`/api/messages${query ? `?${query}` : ''}`);
   },
 
   // 标记消息为已读
   markAsRead: (messageId: string): Promise<ApiResponse<null>> => {
-    return api.patch(`/messages/${messageId}/read`);
+    return api.patch(`/api/messages/${messageId}/read`);
   },
 
   // 标记所有消息为已读
   markAllAsRead: (): Promise<ApiResponse<null>> => {
-    return api.patch('/messages/read-all');
+    return api.patch('/api/messages/read-all');
   },
 
   // 删除消息
   deleteMessage: (messageId: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/messages/${messageId}`);
+    return api.delete(`/api/messages/${messageId}`);
   },
+};
+
+// 微信扫码登录 API
+export const wechatAuthApi = {
+  // 生成微信登录二维码和key
+  generate: (redirect?: string) =>
+    api.post('/api/auth/wechat/generate', redirect ? { redirect } : undefined),
+
+  // 轮询扫码状态
+  getStatus: (key: string) =>
+    api.get(`/api/auth/wechat/status/${key}`),
+
+  // 凭 code 获取 openid 并登录
+  getOpenid: (code: string) =>
+    api.get(`/api/auth/wechat/openid?code=${code}`),
 }; 

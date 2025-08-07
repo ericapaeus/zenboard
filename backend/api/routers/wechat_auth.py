@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 import httpx
 import os
+import logging
 from config import AUTH_API_KEY, AUTH_API_BASE_URL
 from sqlalchemy.orm import Session
 from database.database import get_db
@@ -10,6 +11,7 @@ from api.schemas.wechat_proxy import WechatAuthData, RefreshTokenRequest
 from api.schemas.user import UserResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # 确保AUTH_API_KEY和AUTH_API_BASE_URL已配置
 if not AUTH_API_KEY or not AUTH_API_BASE_URL:
@@ -21,18 +23,20 @@ async def generate_wechat_login_credentials(redirect: str | None = Query(None)):
     获取微信登录凭据（包含登录 URL 和会话 Key）。
     """
     api_url = f"{AUTH_API_BASE_URL}/auth/generate"
+    logger.info(f"请求上游API URL: {api_url}")
 
     headers = {"x-api-key": AUTH_API_KEY}
     payload = {}
     if redirect:
         payload["redirect"] = redirect
 
-    print("==============")
+    logger.info("==============")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(api_url, headers=headers, json=payload)
             response.raise_for_status()
             response_data = response.json()
+            logger.info(f"上游API响应: {response_data}")
             return ApiResponse(
                 success=response_data.get("success", True),
                 message=response_data.get("message", "Success"),
@@ -53,12 +57,16 @@ async def get_wechat_login_status(key: str):
     检查用户扫码登录状态。
     """
     api_url = f"{AUTH_API_BASE_URL}/auth/status/{key}"
+    logger.info(f"请求上游API URL: {api_url}")
+    logger.info(f"检查的key: {key}")
     
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(api_url)
+            logger.info(f"上游API响应状态码: {response.status_code}")
             response.raise_for_status()
             response_data = response.json()
+            logger.info(f"上游API响应数据: {response_data}")
             return ApiResponse(
                 success=response_data.get("success", True),
                 message=response_data.get("message", "Success"),
@@ -66,10 +74,13 @@ async def get_wechat_login_status(key: str):
                 code=response_data.get("code", 200)
             )
     except httpx.HTTPStatusError as e:
+        logger.error(f"上游API HTTP错误: {e.response.status_code} - {e.response.text}")
         return ApiResponse(code=e.response.status_code, success=False, message=f"上游API返回错误: {e.response.text}")
     except httpx.RequestError as e:
+        logger.error(f"请求上游API失败: {e}")
         return ApiResponse(code=500, success=False, message=f"请求上游API失败: {e}")
     except Exception as e:
+        logger.error(f"检查登录状态失败: {str(e)}")
         return ApiResponse(code=500, success=False, message=f"检查登录状态失败: {str(e)}")
 
 
@@ -82,6 +93,7 @@ async def get_wechat_openid(
     凭 code 获取用户 openid。
     """
     api_url = f"{AUTH_API_BASE_URL}/auth/openid"
+    logger.info(f"请求上游API URL: {api_url}")
     headers = {"x-api-key": AUTH_API_KEY}
     params = {"code": code}
 

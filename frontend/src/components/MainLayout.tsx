@@ -31,25 +31,20 @@ function getBreadcrumbItems(pathname: string) {
   return items;
 }
 
+// 新增：根据 path 动态获取标签页 label
+function getTabLabelByPath(path: string): string {
+  const route = findRouteByPath(path, routes);
+  return route ? route.label : '未知页面';
+}
+
 export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // 标签页配置映射
-  const tabConfig: { [key: string]: { key: string; label: string; closable: boolean } } = {
-    "/": { key: "/", label: "控制台", closable: false },
-    "/users/list": { key: "/users/list", label: "用户管理", closable: true },
-    "/products": { key: "/products", label: "产品管理", closable: true },
-    "/orders": { key: "/orders", label: "订单管理", closable: true },
-    "/messages": { key: "/messages", label: "消息中心", closable: true },
-    "/tenant": { key: "/tenant", label: "租户管理", closable: true },
-    "/menu": { key: "/menu", label: "菜单管理", closable: true },
-    "/role": { key: "/role", label: "角色管理", closable: true },
-  };
   // 动态标签页
   const [tabs, setTabs] = useState([
-    tabConfig["/"]
+    { key: "/", label: "控制台", closable: false }
   ]);
   const [activeTab, setActiveTab] = useState("/");
 
@@ -84,10 +79,12 @@ export default function MainLayout() {
 
   // 侧边栏菜单点击，动态添加标签页
   const handleMenuClick = useCallback((key: string) => {
-    if (!tabConfig[key]) return;
     setTabs((prevTabs) => {
       if (prevTabs.find((tab) => tab.key === key)) return prevTabs;
-      return [...prevTabs, tabConfig[key]];
+      return [
+        ...prevTabs,
+        { key, label: getTabLabelByPath(key), closable: key !== "/" }
+      ];
     });
     setActiveTab(key);
     navigate(key);

@@ -1,5 +1,5 @@
 // API 响应类型定义
-export interface ApiResponse<T = any> {
+export type ApiResponse<T = any> = {
   success: boolean;
   code: number;
   message: string;
@@ -61,12 +61,25 @@ const fetchBase = async (
     requestHeaders.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: requestHeaders,
-  });
+  // 创建 AbortController 用于超时控制
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
-  return response;
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: requestHeaders,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('请求超时，请检查网络连接');
+    }
+    throw error;
+  }
 };
 
 /**
@@ -75,6 +88,12 @@ const fetchBase = async (
 const responseToApiResponse = async <T>(response: Response): Promise<ApiResponse<T>> => {
   try {
     const jsonResponse: ApiResponse<T> = await response.json();
+    
+    // 如果响应状态码不是200，抛出错误
+    if (response.status !== 200) {
+      throw new Error(`HTTP ${response.status}: ${jsonResponse.message || '请求失败'}`);
+    }
+    
     return jsonResponse;
   } catch (e) {
     console.error('Error parsing API response:', e);
