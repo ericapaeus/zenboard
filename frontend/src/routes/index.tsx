@@ -26,6 +26,7 @@ export const routes: RouteConfig[] = [
     children: [
       { path: '/tasks/my', label: '任务列表', icon: <UserOutlined /> },
       { path: '/tasks/projects', label: '项目列表', icon: <ProjectOutlined /> },
+      { path: '/tasks/projects/:projectId', label: '项目详情', icon: <ProjectOutlined />, meta: { hiddenInSidebar: true } }, // Change label to '项目详情'
     ],
   },
   {
@@ -53,4 +54,4 @@ export const routes: RouteConfig[] = [
 ];
 
 // 重新导出类型定义
-export type { RouteConfig } from './types'; 
+export type { RouteConfig } from './types';

@@ -6,7 +6,7 @@ const pathPatterns: Array<{ pattern: RegExp, componentName: string }> = [
   { pattern: /^\/tasks\/projects$/, componentName: 'MyProjects' },
   { pattern: /^\/tasks\/private$/, componentName: 'PrivateTasks' },
   { pattern: /^\/team\/members$/, componentName: 'TeamMembers' }, // Add mapping for TeamMembers
-  { pattern: /^\/projects\/[^/]+\/tasks$/, componentName: 'ProjectTasks' }, // 匹配 /projects/任意ID/tasks
+  { pattern: /^\/tasks\/projects\/[^/]+$/, componentName: 'ProjectTasks' }, // 匹配 /tasks/projects/任意ID
   { pattern: /^\/diary\/my$/, componentName: 'MyDiaries' },
   { pattern: /^\/settings\/profile$/, componentName: 'Profile' }, // 添加个人资料页面映射
   { pattern: /^\/settings\/system$/, componentName: 'SystemConfig' }, // 添加系统配置页面映射

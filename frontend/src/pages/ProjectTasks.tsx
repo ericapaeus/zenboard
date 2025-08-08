@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm } from 'antd';
+import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm, Space } from 'antd';
 import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useParams } from 'react-router-dom'; // Import useParams
 
@@ -37,6 +37,9 @@ const ProjectTasks: React.FC = () => {
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [showAddSubtaskForm, setShowAddSubtaskForm] = useState(false);
+  const [isMembersModalVisible, setIsMembersModalVisible] = useState(false); // State for members modal
+  const [projectMembers, setProjectMembers] = useState<string[]>([]); // State for current project members
+  const [newMemberId, setNewMemberId] = useState<string | undefined>(undefined); // State for new member to add
 
   // Mock data for all tasks (including projectId for filtering)
   const [allTasks, setAllTasks] = useState<Task[]>([
@@ -124,6 +127,36 @@ const ProjectTasks: React.FC = () => {
 
   const currentProjectName = mockProjects.find(p => p.id === projectId)?.name || '未知项目';
 
+  // Mock all available users for adding members
+  const allAvailableUsers = ['张三', '李四', '王五', '赵六', '孙七', '周八', '吴九'];
+
+  // Initialize project members based on projectId (mock data for now)
+  useEffect(() => {
+    // In a real application, you would fetch project members from an API
+    // For now, let's mock some members based on projectId
+    if (projectId === 'p1') {
+      setProjectMembers(['张三', '李四']);
+    } else if (projectId === 'p2') {
+      setProjectMembers(['王五', '赵六']);
+    } else {
+      setProjectMembers([]);
+    }
+  }, [projectId]);
+
+  const handleAddMember = () => {
+    if (newMemberId && !projectMembers.includes(newMemberId)) {
+      setProjectMembers([...projectMembers, newMemberId]);
+      message.success(`成员 ${newMemberId} 已添加！`);
+      setNewMemberId(undefined); // Clear selection
+    } else if (newMemberId && projectMembers.includes(newMemberId)) {
+      message.warning(`成员 ${newMemberId} 已存在！`);
+    }
+  };
+
+  const handleDeleteMember = (memberToDelete: string) => {
+    setProjectMembers(projectMembers.filter(member => member !== memberToDelete));
+    message.success(`成员 ${memberToDelete} 已删除！`);
+  };
 
   const getStatusTag = (status: Task['status']) => {
     switch (status) {
@@ -272,10 +305,15 @@ const ProjectTasks: React.FC = () => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <Title level={2} className="m-0">{currentProjectName} 的任务</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateModalOpen}>
-          创建任务
-        </Button>
+        <Title level={2} className="m-0">{currentProjectName} 的详情</Title>
+        <Space>
+          <Button type="default" icon={<UserOutlined />} onClick={() => setIsMembersModalVisible(true)}>
+            项目成员
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateModalOpen}>
+            创建任务
+          </Button>
+        </Space>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTasks.map(task => (
@@ -568,6 +606,55 @@ const ProjectTasks: React.FC = () => {
           </Form>
         </Modal>
       )}
+
+      {/* Project Members Modal */}
+      <Modal
+        title={`项目成员: ${currentProjectName}`}
+        visible={isMembersModalVisible}
+        onCancel={() => setIsMembersModalVisible(false)}
+        footer={null}
+      >
+        <Title level={5}>当前成员</Title>
+        <List
+          bordered
+          dataSource={projectMembers}
+          renderItem={member => (
+            <List.Item
+              actions={[
+                <Popconfirm
+                  title={`确定要删除成员 ${member} 吗？`}
+                  onConfirm={() => handleDeleteMember(member)}
+                  okText="是"
+                  cancelText="否"
+                >
+                  <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
+                </Popconfirm>,
+              ]}
+            >
+              {member}
+            </List.Item>
+          )}
+        />
+
+        <Title level={5} className="mt-4">添加新成员</Title>
+        <Space>
+          <Select
+            placeholder="选择要添加的成员"
+            style={{ width: 200 }}
+            value={newMemberId}
+            onChange={(value: string) => setNewMemberId(value)}
+          >
+            {allAvailableUsers
+              .filter(user => !projectMembers.includes(user)) // Filter out existing members
+              .map(user => (
+                <Option key={user} value={user}>{user}</Option>
+              ))}
+          </Select>
+          <Button type="primary" onClick={handleAddMember} disabled={!newMemberId}>
+            添加
+          </Button>
+        </Space>
+      </Modal>
     </div>
   );
 };

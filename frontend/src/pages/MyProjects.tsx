@@ -51,7 +51,7 @@ const MyProjects: React.FC = () => {
   ]);
 
   const handleViewProjectTasks = (projectId: string, projectName: string) => {
-    navigate(`/projects/${projectId}/tasks`);
+    navigate(`/tasks/projects/${projectId}`);
   };
 
   const handleCreateModalOpen = () => {
@@ -124,7 +124,7 @@ const MyProjects: React.FC = () => {
           <List.Item
             actions={[
               <Button type="link" onClick={() => handleViewProjectTasks(project.id, project.name)}>
-                项目任务 <RightOutlined />
+                项目详情 <RightOutlined />
               </Button>,
             ]}
           >
