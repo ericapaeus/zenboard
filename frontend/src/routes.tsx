@@ -29,16 +29,6 @@ export const routes: RouteConfig[] = [
     ],
   },
   {
-    path: '/projects',
-    label: '项目管理',
-    icon: <ProjectOutlined />,
-    children: [
-      { path: '/projects/create', label: '创建项目', icon: <PlusOutlined /> },
-      { path: '/projects/board', label: '团队公告板', icon: <DashboardOutlined /> },
-      { path: '/projects/:projectId/tasks', label: '项目任务', icon: <CheckSquareOutlined /> },
-    ],
-  },
-  {
     path: '/tasks',
     label: '任务管理',
     icon: <CheckSquareOutlined />,
@@ -46,6 +36,16 @@ export const routes: RouteConfig[] = [
       { path: '/tasks/my', label: '我的任务', icon: <UserOutlined /> },
       { path: '/tasks/projects', label: '我的项目', icon: <ProjectOutlined /> },
       { path: '/tasks/private', label: '私有任务', icon: <BookOutlined /> },
+    ],
+  },
+  {
+    path: '/projects',
+    label: '项目管理',
+    icon: <ProjectOutlined />,
+    children: [
+      { path: '/projects/create', label: '创建项目', icon: <PlusOutlined /> },
+      { path: '/projects/board', label: '团队公告板', icon: <DashboardOutlined /> },
+      { path: '/projects/:projectId/tasks', label: '项目任务', icon: <CheckSquareOutlined /> },
     ],
   },
   {
@@ -68,4 +68,4 @@ export const routes: RouteConfig[] = [
       { path: '/settings/system', label: '系统配置', icon: <SettingOutlined /> },
     ],
   },
-]; 
+];
