@@ -2,8 +2,7 @@ import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import MainLayout from "./components/MainLayout";
-import { routes } from './routes';
-import type { RouteConfig } from './routes';
+import { routes, type RouteConfig } from './routes/index';
 import { lazyPage } from './lazyPage';
 
 function RequireAuth({ children }: React.PropsWithChildren<{ children: React.ReactNode }>) {

@@ -153,6 +153,10 @@ export default function MainLayout() {
     if (key === "logout") {
       localStorage.removeItem("isLogin");
       navigate("/login");
+    } else if (key === "profile") {
+      navigate("/settings/profile");
+    } else if (key === "settings") {
+      navigate("/settings/system");
     }
   };
 

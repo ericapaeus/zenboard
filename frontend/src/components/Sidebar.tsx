@@ -19,17 +19,19 @@ function getOpenKeys(pathname: string) {
 }
 
 const renderMenuItems = (routes: RouteConfig[]) =>
-  routes.map(route =>
-    route.children ? (
-      <Menu.SubMenu key={route.path} icon={route.icon} title={route.label}>
-        {renderMenuItems(route.children)}
-      </Menu.SubMenu>
-    ) : (
-      <Menu.Item key={route.path} icon={route.icon}>
-        <Link to={route.path}>{route.label}</Link>
-      </Menu.Item>
-    )
-  );
+  routes
+    .filter(route => !route.meta?.hiddenInSidebar) // 过滤掉隐藏的路由
+    .map(route =>
+      route.children ? (
+        <Menu.SubMenu key={route.path} icon={route.icon} title={route.label}>
+          {renderMenuItems(route.children)}
+        </Menu.SubMenu>
+      ) : (
+        <Menu.Item key={route.path} icon={route.icon}>
+          <Link to={route.path}>{route.label}</Link>
+        </Menu.Item>
+      )
+    );
 
 const Sidebar: React.FC<SidebarProps> = ({ onMenuClick }) => {
   const location = useLocation();
