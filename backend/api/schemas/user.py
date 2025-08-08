@@ -17,8 +17,11 @@ class UserUpdate(BaseModel):
     hire_date: Optional[datetime] = Field(None, description="入职日期")
     contract_expiry: Optional[datetime] = Field(None, description="合同到期日")
 
-class UserResponse(UserBase):
+class UserResponse(BaseModel):
     id: int
+    username: Optional[str] = ""
+    email: Optional[EmailStr] = None
+    nickname: str
     status: str
     avatar: Optional[str] = None
     hire_date: Optional[datetime] = None

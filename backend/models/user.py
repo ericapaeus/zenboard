@@ -31,7 +31,7 @@ class User(Base):
     
     # 关系
     projects = relationship("ProjectMembership", back_populates="user")
-    tasks = relationship("Task", back_populates="assignee")
+    tasks = relationship("Task", foreign_keys="Task.assignee_id", back_populates="assignee")
     created_tasks = relationship("Task", foreign_keys="Task.creator_id", back_populates="creator")
     diary_entries = relationship("DiaryEntry", back_populates="author")
     comments = relationship("Comment", back_populates="author")

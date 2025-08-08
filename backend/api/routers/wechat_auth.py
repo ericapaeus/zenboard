@@ -9,6 +9,8 @@ from services.auth_service import AuthService
 from api.schemas.response import ApiResponse
 from api.schemas.wechat_proxy import WechatAuthData, RefreshTokenRequest
 from api.schemas.user import UserResponse
+from models.user import User
+from api.dependencies import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 # 确保AUTH_API_KEY和AUTH_API_BASE_URL已配置
 if not AUTH_API_KEY or not AUTH_API_BASE_URL:
     raise ValueError("AUTH_API_KEY and AUTH_API_BASE_URL must be set in environment variables.")
+
 
 @router.post("/generate", response_model=ApiResponse[WechatAuthData], summary="生成微信登录凭据")
 async def generate_wechat_login_credentials(redirect: str | None = Query(None)):
@@ -162,24 +165,32 @@ async def refresh_token(
 
 @router.get("/me", response_model=ApiResponse[UserResponse], summary="获取当前登录用户信息")
 async def read_users_me(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     获取当前登录用户信息。
     """
-    # 这里需要实现获取当前用户的逻辑
-    # 暂时返回模拟数据
-    return ApiResponse(
-        success=True,
-        message="Success",
-        data=UserResponse(
-            id=1,
-            username="test_user",
-            email="test@example.com",
-            nickname="测试用户",
-            status="active",
-            created_at="2024-01-01T00:00:00",
-            updated_at="2024-01-01T00:00:00"
-        ),
-        code=200
-    ) 
+    try:
+        return ApiResponse(
+            success=True,
+            message="Success",
+            data=UserResponse(
+                id=current_user.id,
+                username=current_user.username or "",
+                email=(current_user.email if current_user.email else None),
+                nickname=current_user.nickname,
+                status=current_user.status,
+                created_at=current_user.created_at,
+                updated_at=current_user.updated_at
+            ),
+            code=200
+        )
+    except Exception as e:
+        logger.error(f"获取用户信息失败: {str(e)}")
+        return ApiResponse(
+            success=False,
+            message=f"获取用户信息失败: {str(e)}",
+            data=None,
+            code=500
+        ) 

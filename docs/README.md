@@ -118,8 +118,7 @@ cd backend
 # 同步开发依赖
 uv sync
 
-# 启动开发服务器 (带热重载)
-uv run uvicorn main:app --reload
+# 启
 ```
 
 ### 3. 前端开发

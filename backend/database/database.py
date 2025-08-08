@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from config import DATABASE_URL
+from .base import Base
 
 # 创建数据库引擎
 engine = create_engine(
@@ -12,8 +12,6 @@ engine = create_engine(
 # 创建会话工厂
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# 创建基础模型
-Base = declarative_base()
 
 def get_db():
     """
@@ -24,6 +22,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 def create_tables():
     """

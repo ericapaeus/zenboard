@@ -8,6 +8,8 @@ class WechatAuthData(BaseModel):
     url: Optional[str] = None
     openid: Optional[str] = None
     name: Optional[str] = None
+    status: Optional[str] = None  # 添加 status 字段
+    code: Optional[str] = None    # 添加 code 字段
     access_token: Optional[str] = None
     token_type: Optional[str] = None
     refresh_token: Optional[str] = None

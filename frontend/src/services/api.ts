@@ -87,7 +87,7 @@ export const authApi = {
 
   // 获取当前用户信息
   getCurrentUser: (): Promise<ApiResponse<User>> => {
-    return api.get('/api/auth/me');
+    return api.get('/api/auth/wechat/me');
   },
 };
 

@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { Spin, message } from "antd";
 import { QrcodeOutlined } from "@ant-design/icons";
-import { wechatAuthApi } from "@/services/api";
+import { wechatAuthApi, authApi } from "@/services/api";
 import { QRCode } from "antd";
 
 export default function Login() {
@@ -12,6 +12,7 @@ export default function Login() {
   const [polling, setPolling] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
+  const [scanStatus, setScanStatus] = useState<'pending' | 'scanned' | 'success' | 'expired'>('pending');
   const hasInitialized = useRef(false);
 
   // 获取二维码和key
@@ -21,8 +22,8 @@ export default function Login() {
       const res = await wechatAuthApi.generate();
       if (res.success) {
       console.log("获取二维码成功:", res.data)
-        setQrData({ url: res.data.url, key: res.data.key });
-        console.log("设置的key:", res.data.key);
+        setQrData({ url: (res.data as any).url, key: (res.data as any).key });
+        console.log("设置的key:", (res.data as any).key);
       } else {
         message.error(res.message || "获取二维码失败");
       }
@@ -45,6 +46,7 @@ export default function Login() {
     setPolling(false); // 停止当前轮询
     setQrData(null); // 清空旧的二维码数据
     setIsExpired(false); // 重置过期状态
+    setScanStatus('pending'); // 重置扫码状态
     hasInitialized.current = false; // 重置初始化标志
     
     try {
@@ -66,19 +68,49 @@ export default function Login() {
       try {
         console.log("轮询使用的key:", qrData.key);
         const res = await wechatAuthApi.getStatus(qrData.key);
-        if (res.success && res.data.status === "used") {
+        const status = (res.data as any).status;
+        
+        // 根据状态设置扫码状态
+        if (status === "scanned") {
+          setScanStatus('scanned');
+        } else if (status === "success") {
+          setScanStatus('success');
+          // 扫码成功，立即停止轮询
+          setPolling(false);
+          clearInterval(timer);
+          
           // 获取 openid 并登录
-          const code = res.data.code;
+          const code = (res.data as any).code;
+          console.log("扫码成功，获取到 code:", code);
+          
           const loginRes = await wechatAuthApi.getOpenid(code);
           if (loginRes.success) {
             localStorage.setItem("isLogin", "1");
-            localStorage.setItem("access_token", loginRes.data.access_token);
+            localStorage.setItem("access_token", (loginRes.data as any).access_token);
+            
+            // 获取用户信息
+            try {
+              const userRes = await authApi.getCurrentUser();
+              if (userRes.success) {
+                localStorage.setItem("userInfo", JSON.stringify(userRes.data));
             message.success("登录成功！");
-            setPolling(false);
+                navigate("/");
+              } else {
+                message.error("获取用户信息失败");
+              }
+            } catch (userError) {
+              console.error("获取用户信息失败:", userError);
+              message.error("获取用户信息失败，但登录成功");
             navigate("/");
+            }
           } else {
             message.error(loginRes.message || "登录失败");
           }
+        } else if (status === "expired") {
+          setScanStatus('expired');
+          setPolling(false);
+          setIsExpired(true);
+          clearInterval(timer);
         }
       } catch (error) {
         console.error("轮询扫码状态失败:", error);
@@ -91,16 +123,21 @@ export default function Login() {
           console.warn("二维码已过期");
           setPolling(false);
           setIsExpired(true);
+          setScanStatus('expired');
+          clearInterval(timer);
         }
       }
     }, 2000);
+    
     // 60秒超时
     const timeoutId = setTimeout(() => {
       setPolling(false);
       setIsExpired(true);
+      setScanStatus('expired');
       clearInterval(timer);
       message.error("二维码已过期，请刷新重试");
     }, 60000);
+    
     return () => {
       setPolling(false);
       clearInterval(timer);
@@ -169,6 +206,24 @@ export default function Login() {
             {isLoading && (
               <div className="absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center">
                 <Spin size="large" />
+              </div>
+            )}
+            {/* 扫码状态遮罩 */}
+            {scanStatus === 'scanned' && (
+              <div className="absolute inset-0 bg-blue-500/60 rounded-xl flex items-center justify-center">
+                <div className="text-white text-center">
+                  <div className="text-lg font-semibold mb-2">扫码中</div>
+                  <div className="text-sm opacity-90">请确认登录</div>
+                </div>
+              </div>
+            )}
+            {/* 扫码成功遮罩 */}
+            {scanStatus === 'success' && (
+              <div className="absolute inset-0 bg-green-500/60 rounded-xl flex items-center justify-center">
+                <div className="text-white text-center">
+                  <div className="text-lg font-semibold mb-2">扫码成功</div>
+                  <div className="text-sm opacity-90">正在登录中...</div>
+                </div>
               </div>
             )}
             {/* 二维码过期遮层 */}

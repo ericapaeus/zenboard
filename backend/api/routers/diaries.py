@@ -5,7 +5,8 @@ from database.database import get_db
 from api.schemas.response import ApiResponse
 from api.schemas.diary import DiaryCreate, DiaryUpdate, DiaryResponse, DiaryWithComments
 from services.diary_service import DiaryService
-from services.auth_service import AuthService
+from models.user import User
+from api.dependencies import get_current_user
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ router = APIRouter()
 async def create_diary(
     diary: DiaryCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     创建新日记
@@ -43,7 +44,7 @@ async def get_diaries(
     author_id: Optional[int] = Query(None, description="作者ID过滤"),
     visibility: Optional[str] = Query(None, description="可见性过滤"),
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     获取日记列表
@@ -70,7 +71,7 @@ async def get_diaries(
 async def get_diary(
     diary_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     获取日记详情
@@ -96,7 +97,7 @@ async def update_diary(
     diary_id: int,
     diary_update: DiaryUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     更新日记信息
@@ -121,7 +122,7 @@ async def update_diary(
 async def delete_diary(
     diary_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     删除日记

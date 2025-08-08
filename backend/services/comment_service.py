@@ -1,6 +1,8 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
 from api.schemas.comment import CommentCreate, CommentUpdate, CommentResponse
+from models.comment import Comment
 import logging
 
 logger = logging.getLogger(__name__)
@@ -42,6 +44,19 @@ class CommentService:
         pass
 
     async def delete_comment(self, comment_id: int, user_id: int):
-        """删除评论"""
-        # TODO: 实现评论删除逻辑
-        pass 
+        """删除评论（仅作者可删）"""
+        comment: Comment | None = self.db.query(Comment).filter(Comment.id == comment_id).first()
+        if comment is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="评论不存在")
+
+        if comment.author_id != user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限删除该评论")
+
+        try:
+            self.db.delete(comment)
+            self.db.commit()
+            return {"deleted": True}
+        except Exception as e:
+            logger.error(f"删除评论失败: {e}")
+            self.db.rollback()
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="删除评论失败") 

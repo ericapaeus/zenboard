@@ -5,7 +5,8 @@ from database.database import get_db
 from api.schemas.response import ApiResponse
 from api.schemas.task import TaskCreate, TaskUpdate, TaskResponse, TaskWithSubtasks
 from services.task_service import TaskService
-from services.auth_service import AuthService
+from models.user import User
+from api.dependencies import get_current_user
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ router = APIRouter()
 async def create_task(
     task: TaskCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     创建新任务
@@ -44,7 +45,7 @@ async def get_tasks(
     status_filter: Optional[str] = Query(None, description="任务状态过滤"),
     assignee_id: Optional[int] = Query(None, description="指派用户过滤"),
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     获取任务列表
@@ -71,7 +72,7 @@ async def get_tasks(
 async def get_task(
     task_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     获取任务详情
@@ -97,7 +98,7 @@ async def update_task(
     task_id: int,
     task_update: TaskUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     更新任务信息
@@ -122,7 +123,7 @@ async def update_task(
 async def delete_task(
     task_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     删除任务

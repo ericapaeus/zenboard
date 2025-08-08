@@ -5,7 +5,8 @@ from database.database import get_db
 from api.schemas.response import ApiResponse
 from api.schemas.comment import CommentCreate, CommentUpdate, CommentResponse
 from services.comment_service import CommentService
-from services.auth_service import AuthService
+from models.user import User
+from api.dependencies import get_current_user
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ router = APIRouter()
 async def create_comment(
     comment: CommentCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     创建新评论
@@ -43,7 +44,7 @@ async def get_comments(
     task_id: Optional[int] = Query(None, description="任务ID过滤"),
     diary_entry_id: Optional[int] = Query(None, description="日记ID过滤"),
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     获取评论列表
@@ -70,7 +71,7 @@ async def get_comments(
 async def get_comment(
     comment_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     获取评论详情
@@ -96,7 +97,7 @@ async def update_comment(
     comment_id: int,
     comment_update: CommentUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     更新评论信息
@@ -121,7 +122,7 @@ async def update_comment(
 async def delete_comment(
     comment_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(AuthService.get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """
     删除评论
