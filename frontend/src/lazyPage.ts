@@ -7,6 +7,8 @@ const pathPatterns: Array<{ pattern: RegExp, componentName: string }> = [
   { pattern: /^\/tasks\/private$/, componentName: 'PrivateTasks' },
   { pattern: /^\/team\/members$/, componentName: 'TeamMembers' }, // Add mapping for TeamMembers
   { pattern: /^\/projects\/[^/]+\/tasks$/, componentName: 'ProjectTasks' }, // 匹配 /projects/任意ID/tasks
+  { pattern: /^\/settings\/profile$/, componentName: 'Profile' }, // 添加个人资料页面映射
+  { pattern: /^\/settings\/system$/, componentName: 'SystemConfig' }, // 添加系统配置页面映射
   // 其它页面模式可继续补充
 ];
 
