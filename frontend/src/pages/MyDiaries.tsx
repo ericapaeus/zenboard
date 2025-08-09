@@ -1,22 +1,17 @@
 import React, { useState } from 'react';
-import { DatePicker, Button, Space, Typography, Modal, Form, Radio, Select, Row, Col, message, List, Card } from 'antd';
+import { DatePicker, Button, Space, Typography, Modal, Form, Radio, Select, Row, Col, message, List, Card, Input } from 'antd';
 import { PlusOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import { v4 as uuidv4 } from 'uuid'; // For unique IDs
-import SimpleMdeReact from 'react-simplemde-editor';
-import 'easymde/dist/easymde.min.css'; // Import the styles
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
 dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
 
 const { RangePicker } = DatePicker;
 const { Title, Text, Paragraph } = Typography;
-// const { TextArea } = Input; // Removed as SimpleMdeReact is used
 const { Option } = Select;
+const { TextArea } = Input;
 
 interface CommentEntry {
   id: string;
@@ -46,7 +41,7 @@ const MyDiaries: React.FC = () => {
   const [drafts, setDrafts] = useState<DiaryEntry[]>([]); // To store drafts
   const [diaries, setDiaries] = useState<DiaryEntry[]>([ // To store submitted diaries
     {
-      id: uuidv4(),
+      id: '1',
       date: '2025-07-20',
       type: 'public',
       content: '今天天气真好，适合出去散步。',
@@ -54,7 +49,7 @@ const MyDiaries: React.FC = () => {
       comments: [],
     },
     {
-      id: uuidv4(),
+      id: '2',
       date: '2025-07-18',
       type: 'project',
       content: '项目进展顺利，完成了模块A的开发。',
@@ -62,7 +57,7 @@ const MyDiaries: React.FC = () => {
       comments: [],
     },
     {
-      id: uuidv4(),
+      id: '3',
       date: '2025-07-15',
       type: 'private',
       content: '思考了一些个人问题，感觉豁然开朗。',
@@ -90,7 +85,7 @@ const MyDiaries: React.FC = () => {
   const handleSaveDraft = () => {
     form.validateFields().then(values => {
       const newDraft: DiaryEntry = {
-        id: editingDraftId || uuidv4(), // Use existing ID if editing, otherwise new ID
+        id: editingDraftId || String(Date.now()), // Use existing ID if editing, otherwise new ID
         date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
         type: diaryType,
         content: values.content,
@@ -117,7 +112,7 @@ const MyDiaries: React.FC = () => {
   const handleSubmit = () => {
     form.validateFields().then(values => {
       const newDiary: DiaryEntry = {
-        id: uuidv4(),
+        id: String(Date.now()),
         date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
         type: diaryType,
         content: values.content,
@@ -165,7 +160,7 @@ const MyDiaries: React.FC = () => {
 
   const handleAddComment = (diaryId: string, commentContent: string) => {
     const newComment: CommentEntry = {
-      id: uuidv4(),
+      id: String(Date.now()),
       author: '当前用户', // Replace with actual user name
       date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
       content: commentContent,
@@ -187,7 +182,7 @@ const MyDiaries: React.FC = () => {
     commentForm.resetFields(); // Clear comment input
   };
 
-  const handleDateRangeChange = (dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null, dateStrings: [string, string]) => {
+  const handleDateRangeChange = (dates: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) => {
     if (dates && dates[0] && dates[1]) {
       setSelectedDateRange([dates[0], dates[1]]);
     } else {
@@ -295,14 +290,7 @@ const MyDiaries: React.FC = () => {
             </Col>
             <Col span={16}>
               <Form.Item label="日记内容" name="content" rules={[{ required: true, message: '请输入日记内容！' }]}>
-                <SimpleMdeReact
-                  options={{
-                    spellChecker: false,
-                    hideIcons: ['guide', 'fullscreen', 'side-by-side'],
-                  }}
-                  value={form.getFieldValue('content')}
-                  onChange={(value) => form.setFieldsValue({ content: value })}
-                />
+                <TextArea rows={8} placeholder="请输入日记内容..." />
               </Form.Item>
             </Col>
           </Row>
@@ -332,7 +320,7 @@ const MyDiaries: React.FC = () => {
             )}
             <p><strong>内容:</strong></p>
             <div style={{ whiteSpace: 'pre-wrap', marginBottom: 20 }}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewedDiary.content}</ReactMarkdown>
+              {viewedDiary.content}
             </div>
 
             <Title level={5}>评论</Title>
@@ -342,7 +330,7 @@ const MyDiaries: React.FC = () => {
                 <List.Item>
                   <List.Item.Meta
                     title={<Text strong>{comment.author} - {comment.date}</Text>}
-                    description={<ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>}
+                    description={comment.content}
                   />
                 </List.Item>
               )}
@@ -356,14 +344,7 @@ const MyDiaries: React.FC = () => {
               style={{ marginTop: 20 }}
             >
               <Form.Item name="commentContent" rules={[{ required: true, message: '请输入评论内容！' }]}>
-                <SimpleMdeReact
-                  options={{
-                    spellChecker: false,
-                    hideIcons: ['guide', 'fullscreen', 'side-by-side'],
-                  }}
-                  value={commentForm.getFieldValue('commentContent')}
-                  onChange={(value) => commentForm.setFieldsValue({ commentContent: value })}
-                />
+                <TextArea rows={4} placeholder="请输入评论内容..." />
               </Form.Item>
               <Form.Item>
                 <Button type="primary" htmlType="submit">

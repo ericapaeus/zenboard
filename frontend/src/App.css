@@ -281,31 +281,34 @@
     border-bottom: 1px solid #f0f0f0;
     box-shadow: none;
     padding: 0 0 0 8px;
-    min-height: 36px;
+    min-height: 40px;
   }
   .custom-tabs .ant-tabs-tab {
     background: transparent;
-    border-radius: 0;
-    margin-right: 16px !important;
-    padding: 0 12px !important;
-    font-size: 15px;
-    color: #1d2129;
-    min-height: 32px;
-    line-height: 32px;
-    transition: color 0.2s, background 0.2s;
+    border-radius: 6px 6px 0 0;
+    margin-right: 8px !important;
+    padding: 8px 16px !important;
+    font-size: 14px;
+    color: #666;
+    min-height: 36px;
+    line-height: 20px;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
   }
   .custom-tabs .ant-tabs-tab-active {
     color: #165dff !important;
-    background: transparent !important;
-    font-weight: 600;
+    background: #f8faff !important;
+    font-weight: 500;
     border-bottom: 2px solid #165dff;
+    border-color: #e6f0ff;
   }
   .custom-tabs .ant-tabs-tab:not(.ant-tabs-tab-active):hover {
     color: #165dff;
     background: #f5f7fa;
+    border-color: #e6f0ff;
   }
   .custom-tabs .ant-tabs-tab-remove {
-    margin-left: 4px;
+    margin-left: 6px;
     color: #bbb;
     font-size: 12px;
     transition: color 0.2s;
@@ -315,9 +318,11 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    border-radius: 50%;
   }
   .custom-tabs .ant-tabs-tab-remove:hover {
     color: #ff4d4f;
+    background: #fff2f0;
   }
 }
 

@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { Spin, message } from "antd";
 import { QrcodeOutlined } from "@ant-design/icons";
@@ -7,6 +7,7 @@ import { QRCode } from "antd";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [qrData, setQrData] = useState<{ url: string; key: string } | null>(null);
   const [polling, setPolling] = useState(false);
@@ -15,6 +16,31 @@ export default function Login() {
   const [scanStatus, setScanStatus] = useState<'pending' | 'scanned' | 'success' | 'expired'>('pending');
   const hasInitialized = useRef(false);
 
+  // 获取用户原来想访问的页面
+  const getRedirectPath = () => {
+    const from = location.state?.from?.pathname;
+    return from && from !== '/login' ? from : '/';
+  };
+
+  // 处理登录成功后的跳转
+  const handleLoginSuccess = (userStatus: string) => {
+    const redirectPath = getRedirectPath();
+    
+    if (userStatus === "未审核") {
+      message.success("登录成功！请完善个人资料");
+      navigate("/complete-profile");
+    } else if (userStatus === "待审核") {
+      message.success("登录成功！请等待审核");
+      navigate("/pending-review");
+    } else if (userStatus === "已通过") {
+      message.success("登录成功！");
+      navigate(redirectPath);
+    } else {
+      message.error("账户状态异常，请联系管理员");
+      navigate("/login");
+    }
+  };
+
   // 获取二维码和key
   const fetchQRCode = async () => {
     setIsLoading(true);
@@ -22,8 +48,8 @@ export default function Login() {
       const res = await wechatAuthApi.generate();
       if (res.success) {
       console.log("获取二维码成功:", res.data)
-        setQrData({ url: (res.data as any).url, key: (res.data as any).key });
-        console.log("设置的key:", (res.data as any).key);
+        setQrData({ url: (res.data as { url: string; key: string }).url, key: (res.data as { url: string; key: string }).key });
+        console.log("设置的key:", (res.data as { url: string; key: string }).key);
       } else {
         message.error(res.message || "获取二维码失败");
       }
@@ -68,7 +94,7 @@ export default function Login() {
       try {
         console.log("轮询使用的key:", qrData.key);
         const res = await wechatAuthApi.getStatus(qrData.key);
-        const status = (res.data as any).status;
+        const status = (res.data as { status: string }).status;
         
         // 根据状态设置扫码状态
         if (status === "scanned") {
@@ -80,21 +106,22 @@ export default function Login() {
           clearInterval(timer);
           
           // 获取 openid 并登录
-          const code = (res.data as any).code;
+          const code = (res.data as { code: string }).code;
           console.log("扫码成功，获取到 code:", code);
           
           const loginRes = await wechatAuthApi.getOpenid(code);
           if (loginRes.success) {
             localStorage.setItem("isLogin", "1");
-            localStorage.setItem("access_token", (loginRes.data as any).access_token);
+            localStorage.setItem("access_token", (loginRes.data as { access_token: string }).access_token);
             
             // 获取用户信息
             try {
               const userRes = await authApi.getCurrentUser();
               if (userRes.success) {
                 localStorage.setItem("userInfo", JSON.stringify(userRes.data));
-            message.success("登录成功！");
-                navigate("/");
+                
+                // 根据用户状态跳转到不同页面
+                handleLoginSuccess(userRes.data.status);
               } else {
                 message.error("获取用户信息失败");
               }
@@ -145,17 +172,6 @@ export default function Login() {
     };
   }, [qrData?.key, navigate]);
 
-  // 点击二维码直接登录（开发测试用）
-  const handleQRCodeClick = () => {
-    if (qrData && !isExpired) {
-      console.log("开发模式：点击二维码直接登录");
-      localStorage.setItem("isLogin", "1");
-      localStorage.setItem("access_token", "dev_token_" + Date.now());
-      message.success("开发模式：直接登录成功！");
-      navigate("/");
-    }
-  };
-
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
@@ -190,9 +206,9 @@ export default function Login() {
             <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-gray-100">
               {qrData && typeof qrData.url === 'string' && qrData.url.length > 0 ? (
                 <div 
-                  onClick={handleQRCodeClick}
+                  onClick={refreshQRCode}
                   className="cursor-pointer hover:opacity-80 transition-opacity"
-                  title="开发模式：点击直接登录"
+                  title="点击刷新二维码"
                 >
                   <QRCode value={qrData.url} size={192} />
                 </div>
@@ -239,7 +255,6 @@ export default function Login() {
 
           <div className="mt-4 space-y-2">
             <p className="text-gray-600 text-sm">使用手机扫描二维码登录</p>
-            <p className="text-blue-500 text-xs">💡 开发模式：点击二维码可直接登录</p>
             <button
               onClick={refreshQRCode}
               disabled={isLoading || polling || isRefreshing}

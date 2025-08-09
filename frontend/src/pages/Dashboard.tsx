@@ -32,8 +32,8 @@ export default function Dashboard() {
         {/* 系统信息 */}
         <div className="mt-16 text-gray-500">
           <p className="text-sm">ZenBoard v1.0.0 | 让工作更高效</p>
-        </div>
-      </div>
+            </div>
+          </div>
     </>
   );
 }

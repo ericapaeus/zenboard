@@ -4,7 +4,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .schemas.response import ApiResponse
-from database.database import create_tables
+# from database.database import create_tables  # 移除自动建表，改用 Alembic 迁移
 from config import configure_logging, CORS_ORIGINS
 import logging
 
@@ -20,12 +20,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     FastAPI 应用的生命周期事件处理器。
-    在应用启动时初始化数据库。
+    启动时不再自动创建表，完全改为由 Alembic 迁移管理。
     """
     logger.info("Zenith FastAPI 应用启动。")
-    logger.info("--- 开始初始化数据库 ---")
-    create_tables()
-    logger.info("--- 数据库初始化完成 ---")
+    # logger.info("--- 开始初始化数据库 ---")
+    # create_tables()  # 已移除：由 Alembic 迁移管理表结构
+    # logger.info("--- 数据库初始化完成 ---")
 
     yield
     
@@ -91,4 +91,4 @@ async def health_check(request: Request):
     )
 
 # 包含 API 路由器
-app.include_router(api_router) 
+app.include_router(api_router, prefix="/api") 

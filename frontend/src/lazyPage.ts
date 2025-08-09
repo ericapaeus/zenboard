@@ -1,25 +1,22 @@
-import React from "react";
+import React from 'react';
 
-const pathPatterns: Array<{ pattern: RegExp, componentName: string }> = [
-  { pattern: /^\/$/, componentName: 'Dashboard' },
-  { pattern: /^\/tasks\/my$/, componentName: 'MyTasks' },
-  { pattern: /^\/tasks\/projects$/, componentName: 'MyProjects' },
-  { pattern: /^\/tasks\/private$/, componentName: 'PrivateTasks' },
-  { pattern: /^\/team\/members$/, componentName: 'TeamMembers' }, // Add mapping for TeamMembers
-  { pattern: /^\/tasks\/projects\/[^/]+$/, componentName: 'ProjectTasks' }, // 匹配 /tasks/projects/任意ID
-  { pattern: /^\/diary\/my$/, componentName: 'MyDiaries' },
-  { pattern: /^\/settings\/profile$/, componentName: 'Profile' }, // 添加个人资料页面映射
-  { pattern: /^\/settings\/system$/, componentName: 'SystemConfig' }, // 添加系统配置页面映射
-  { pattern: /^\/settings\/system$/, componentName: 'SystemConfig' }, // 添加系统配置页面映射
-  // 其它页面模式可继续补充
-];
+// 页面组件映射
+const pageComponents: Record<string, React.ComponentType> = {
+  '/': React.lazy(() => import('./pages/Dashboard')),
+  '/team/members': React.lazy(() => import('./pages/TeamMembers')),
+  '/documents/list': React.lazy(() => import('./pages/MyDiaries')),
+  '/tasks/list': React.lazy(() => import('./pages/MyTasks')),
+  '/projects/list': React.lazy(() => import('./pages/MyProjects')),
+  '/settings/system': React.lazy(() => import('./pages/SystemConfig')),
+  '/settings/profile': React.lazy(() => import('./pages/Profile')),
+  '/complete-profile': React.lazy(() => import('./pages/CompleteProfile')),
+  '/pending-review': React.lazy(() => import('./pages/PendingReview')),
+};
 
-export function lazyPage(path: string) {
-  for (const { pattern, componentName } of pathPatterns) {
-    if (pattern.test(path)) {
-      return React.lazy(() => import(`./pages/${componentName}`));
-    }
-  }
-  // 如果没有匹配到任何模式，则回退到 Dashboard
-  return React.lazy(() => import(`./pages/Dashboard`));
+export function lazyPage(path: string): React.ComponentType | null {
+  console.log('lazyPage called with path:', path);
+  console.log('Available paths:', Object.keys(pageComponents));
+  const component = pageComponents[path];
+  console.log('Found component:', component ? 'Yes' : 'No');
+  return component || null;
 }

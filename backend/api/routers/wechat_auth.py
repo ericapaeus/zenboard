@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 import httpx
 import os
 import logging
@@ -8,11 +8,13 @@ from database.database import get_db
 from services.auth_service import AuthService
 from api.schemas.response import ApiResponse
 from api.schemas.wechat_proxy import WechatAuthData, RefreshTokenRequest
-from api.schemas.user import UserResponse
+from api.schemas.user import UserResponse, UserUpdate, UserStatus
 from models.user import User
 from api.dependencies import get_current_user
+from services.user_service import UserService
+from typing import Optional
 
-router = APIRouter()
+router = APIRouter(tags=["微信认证"])
 logger = logging.getLogger(__name__)
 
 # 确保AUTH_API_KEY和AUTH_API_BASE_URL已配置
@@ -21,7 +23,7 @@ if not AUTH_API_KEY or not AUTH_API_BASE_URL:
 
 
 @router.post("/generate", response_model=ApiResponse[WechatAuthData], summary="生成微信登录凭据")
-async def generate_wechat_login_credentials(redirect: str | None = Query(None)):
+async def generate_wechat_login_credentials(redirect: str | None = None):
     """
     获取微信登录凭据（包含登录 URL 和会话 Key）。
     """
@@ -87,57 +89,69 @@ async def get_wechat_login_status(key: str):
         return ApiResponse(code=500, success=False, message=f"检查登录状态失败: {str(e)}")
 
 
-@router.get("/openid", response_model=ApiResponse[WechatAuthData], summary="凭 code 获取用户 OpenID")
-async def get_wechat_openid(
-    code: str = Query(...), 
-    db: Session = Depends(get_db)
-):
+@router.get("/openid", response_model=ApiResponse[dict], summary="微信登录获取OpenID")
+async def get_openid(code: str, db: Session = Depends(get_db)):
     """
-    凭 code 获取用户 openid。
+    通过微信授权码获取OpenID并完成登录。
     """
-    api_url = f"{AUTH_API_BASE_URL}/auth/openid"
-    logger.info(f"请求上游API URL: {api_url}")
-    headers = {"x-api-key": AUTH_API_KEY}
-    params = {"code": code}
-
     try:
+        auth_service = AuthService()
+        
+        # 调用微信 API 获取真实的 openid
+        api_url = f"{AUTH_API_BASE_URL}/auth/openid"
+        headers = {"x-api-key": AUTH_API_KEY}
+        params = {"code": code}
+
         async with httpx.AsyncClient() as client:
             response = await client.get(api_url, headers=headers, params=params)
             response.raise_for_status()
-            
             response_data = response.json()
+            
+            if not response_data.get("success"):
+                raise HTTPException(status_code=400, detail="微信API返回错误")
+            
             openid = response_data.get("data", {}).get("openid")
-            name = response_data.get("data", {}).get("name")
-
             if not openid:
-                return ApiResponse(code=400, success=False, message="未能从微信API获取到openid")
+                raise HTTPException(status_code=400, detail="未能从微信API获取到openid")
 
-            # 根据openid创建/获取用户，并生成JWT token
-            auth_service = AuthService()
-            user = auth_service.get_or_create_user_by_openid(db, openid, name)
-            if not user:
-                return ApiResponse(code=500, success=False, message="用户认证失败")
+        # 获取或创建用户
+        user = auth_service.get_or_create_user_by_openid(db, openid)
+        if not user:
+            raise HTTPException(status_code=400, detail="用户创建失败")
 
-            # 生成JWT token
-            token_data = auth_service.create_access_token(data={"sub": str(user.id)})
+        # 创建访问令牌
+        access_token = auth_service.create_access_token(data={"sub": str(user.id)})
             
-            # 将 token 信息添加到响应数据中
-            wechat_auth_data = WechatAuthData(**response_data.get("data", {}))
-            wechat_auth_data.access_token = token_data
-            wechat_auth_data.token_type = "bearer"
-            
-            return ApiResponse(
-                success=response_data.get("success", True),
-                message=response_data.get("message", "Success"),
-                data=wechat_auth_data,
-                code=response_data.get("code", 200)
-            )
+        return ApiResponse(
+            success=True,
+            message="登录成功",
+            data={"access_token": access_token, "token_type": "bearer"},
+            code=200
+        )
     except httpx.HTTPStatusError as e:
-        return ApiResponse(code=e.response.status_code, success=False, message=f"上游API返回错误: {e.response.text}")
+        logger.error(f"微信API HTTP错误: {e.response.status_code} - {e.response.text}")
+        return ApiResponse(
+            success=False,
+            message=f"微信API返回错误: {e.response.text}",
+            data=None,
+            code=e.response.status_code
+        )
     except httpx.RequestError as e:
-        return ApiResponse(code=500, success=False, message=f"请求上游API失败: {e}")
+        logger.error(f"请求微信API失败: {e}")
+        return ApiResponse(
+            success=False,
+            message=f"请求微信API失败: {e}",
+            data=None,
+            code=500
+        )
     except Exception as e:
-        return ApiResponse(code=500, success=False, message=f"获取用户OpenID失败: {str(e)}")
+        logger.error(f"获取用户OpenID失败: {e}")
+        return ApiResponse(
+            success=False,
+            message=f"获取用户OpenID失败: {e}",
+            data=None,
+            code=500
+        )
 
 
 @router.post("/refresh", response_model=ApiResponse[dict], summary="刷新令牌")
@@ -177,20 +191,52 @@ async def read_users_me(
             message="Success",
             data=UserResponse(
                 id=current_user.id,
-                username=current_user.username or "",
                 email=(current_user.email if current_user.email else None),
-                nickname=current_user.nickname,
+                name=current_user.name,
+                phone=current_user.phone,
+                role=current_user.role,
                 status=current_user.status,
+                avatar=current_user.avatar,
+                hire_date=current_user.hire_date,
+                contract_expiry=current_user.contract_expiry,
                 created_at=current_user.created_at,
                 updated_at=current_user.updated_at
             ),
             code=200
         )
     except Exception as e:
-        logger.error(f"获取用户信息失败: {str(e)}")
+        logger.error(f"获取用户信息失败: {e}")
         return ApiResponse(
             success=False,
-            message=f"获取用户信息失败: {str(e)}",
+            message=f"获取用户信息失败: {e}",
+            data=None,
+            code=500
+        )
+
+@router.put("/profile", response_model=ApiResponse[UserResponse], summary="更新用户资料")
+async def update_profile(
+    user_update: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    更新当前用户的资料。
+    """
+    try:
+        user_service = UserService(db)
+        updated_user = await user_service.update_user(current_user.id, user_update)
+        
+        return ApiResponse(
+            success=True,
+            message="资料更新成功",
+            data=updated_user,
+            code=200
+        )
+    except Exception as e:
+        logger.error(f"更新用户资料失败: {e}")
+        return ApiResponse(
+            success=False,
+            message=f"更新用户资料失败: {e}",
             data=None,
             code=500
         ) 

@@ -10,9 +10,42 @@ interface SidebarProps {
   onMenuClick?: (key: string) => void;
 }
 
+// 获取用户信息
+const getUserInfo = () => {
+  try {
+    const userInfoStr = localStorage.getItem('userInfo');
+    return userInfoStr ? JSON.parse(userInfoStr) : null;
+  } catch (error) {
+    console.error('解析用户信息失败:', error);
+    return null;
+  }
+};
+
+// 检查用户是否有权限访问某个路由
+const hasPermission = (route: RouteConfig): boolean => {
+  const userInfo = getUserInfo();
+  if (!userInfo) return false;
+  
+  const userRole = userInfo.role;
+  
+  // 普通用户不能访问的菜单
+  const restrictedMenus = ['/team', '/settings'];
+  
+  if (userRole === '普通用户') {
+    return !restrictedMenus.includes(route.path);
+  }
+  
+  // 管理员可以访问所有菜单
+  return true;
+};
+
 function getOpenKeys(pathname: string) {
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length > 1) {
+    // 特殊处理：项目列表现在在任务管理菜单下
+    if (pathname === '/projects/list') {
+      return ['/tasks'];
+    }
     return [`/${segments[0]}`];
   }
   return [];
@@ -21,17 +54,18 @@ function getOpenKeys(pathname: string) {
 const renderMenuItems = (routes: RouteConfig[]) =>
   routes
     .filter(route => !route.meta?.hiddenInSidebar) // 过滤掉隐藏的路由
+    .filter(route => hasPermission(route)) // 根据用户角色过滤
     .map(route =>
-      route.children ? (
-        <Menu.SubMenu key={route.path} icon={route.icon} title={route.label}>
-          {renderMenuItems(route.children)}
-        </Menu.SubMenu>
-      ) : (
-        <Menu.Item key={route.path} icon={route.icon}>
-          <Link to={route.path}>{route.label}</Link>
-        </Menu.Item>
-      )
-    );
+    route.children ? (
+      <Menu.SubMenu key={route.path} icon={route.icon} title={route.label}>
+        {renderMenuItems(route.children)}
+      </Menu.SubMenu>
+    ) : (
+      <Menu.Item key={route.path} icon={route.icon}>
+        <Link to={route.path}>{route.label}</Link>
+      </Menu.Item>
+    )
+  );
 
 const Sidebar: React.FC<SidebarProps> = ({ onMenuClick }) => {
   const location = useLocation();
@@ -55,12 +89,17 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuClick }) => {
   return (
     <aside className="w-64 bg-white shadow-lg fixed h-full z-30">
       <div className="p-4 border-b flex items-center gap-3">
-        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-          {routes[0].icon}
+        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+          <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
         </div>
-        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          ZenBoard
-        </h1>
+        <div className="flex flex-col">
+          <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            团队协作平台
+          </h1>
+          <p className="text-xs text-gray-500 mt-0.5">Team Collaboration</p>
+        </div>
       </div>
       <nav className="p-4 flex flex-col h-[calc(100%-80px)] overflow-y-auto">
         <Menu

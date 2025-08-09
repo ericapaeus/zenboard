@@ -3,12 +3,15 @@ import type { ApiResponse } from '@/utils/api';
 
 // 类型定义
 export interface User {
-  id: string;
-  username: string;
-  nickname: string;
-  phone: string;
+  id: number;
+  email?: string;
+  name?: string;
+  phone?: string;
   role: string;
-  status: 'active' | 'inactive' | 'pending';
+  status: '未审核' | '待审核' | '已通过' | '已拒绝';
+  avatar?: string;
+  hire_date?: string;
+  contract_expiry?: string;
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +91,18 @@ export const authApi = {
   // 获取当前用户信息
   getCurrentUser: (): Promise<ApiResponse<User>> => {
     return api.get('/api/auth/wechat/me');
+  },
+
+  // 更新用户资料
+  updateProfile: (data: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    hire_date?: Date;
+    contract_expiry?: Date;
+    status?: string;
+  }): Promise<ApiResponse<User>> => {
+    return api.put('/api/auth/wechat/profile', data);
   },
 };
 

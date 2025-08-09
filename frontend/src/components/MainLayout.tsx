@@ -42,9 +42,24 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const [isFullscreen, setIsFullscreen] = useState(false);
   
+  // 获取用户信息
+  const getUserInfo = () => {
+    try {
+      const userInfoStr = localStorage.getItem('userInfo');
+      return userInfoStr ? JSON.parse(userInfoStr) : null;
+    } catch (error) {
+      console.error('解析用户信息失败:', error);
+      return null;
+    }
+  };
+  
+  const userInfo = getUserInfo();
+  const userName = userInfo?.name || '管理员';
+  const userRole = userInfo?.role || '管理员';
+  
   // 动态标签页
   const [tabs, setTabs] = useState([
-    { key: "/", label: "控制台", closable: false }
+    { key: "/", label: "首页", closable: false }
   ]);
   const [activeTab, setActiveTab] = useState("/");
 
@@ -120,11 +135,6 @@ export default function MainLayout() {
       label: "个人资料",
     },
     {
-      key: "settings",
-      icon: <SettingOutlined />,
-      label: "系统设置",
-    },
-    {
       type: "divider" as const,
     },
     {
@@ -155,8 +165,6 @@ export default function MainLayout() {
       navigate("/login");
     } else if (key === "profile") {
       navigate("/settings/profile");
-    } else if (key === "settings") {
-      navigate("/settings/system");
     }
   };
 
@@ -172,41 +180,51 @@ export default function MainLayout() {
       <Sidebar onMenuClick={handleMenuClick} />
       <div className="flex-1 ml-64 flex flex-col">
         {/* 顶部导航栏 */}
-        <header className="fixed top-0 left-64 right-0 z-20 bg-white shadow-sm border-b px-6 py-2">
+        <header className="fixed top-0 left-64 right-0 z-20 bg-white shadow-sm border-b px-6 py-3">
           <div className="flex items-center justify-between">
             {/* 左侧面包屑 */}
             <div className="flex-1">
-              <Breadcrumb items={getBreadcrumbItems(location.pathname)} />
+              <Breadcrumb 
+                items={getBreadcrumbItems(location.pathname)} 
+                className="text-sm"
+              />
             </div>
             
             {/* 右侧用户信息和操作 */}
             <div className="flex items-center space-x-4">
               {/* 操作按钮 */}
-              <Space>
+              <Space size="small">
                 <Dropdown menu={{ items: actionMenuItems, onClick: handleActionMenuClick }} placement="bottomRight">
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                    <TranslationOutlined className="text-gray-600" />
+                  <button className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200">
+                    <TranslationOutlined className="text-gray-600 text-base" />
                   </button>
                 </Dropdown>
                 <button 
                   onClick={toggleFullscreen}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200"
                   title={isFullscreen ? "退出全屏" : "进入全屏"}
                 >
                   {isFullscreen ? (
-                    <FullscreenExitOutlined className="text-gray-600" />
+                    <FullscreenExitOutlined className="text-gray-600 text-base" />
                   ) : (
-                    <FullscreenOutlined className="text-gray-600" />
+                    <FullscreenOutlined className="text-gray-600 text-base" />
                   )}
                 </button>
               </Space>
               
               {/* 用户头像和下拉菜单 */}
               <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
-                <div className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors">
-                  <Avatar icon={<UserOutlined />} size="small" />
-                  <span className="text-gray-700">管理员</span>
-                  <span className="text-gray-400">▼</span>
+                <div className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 rounded-lg px-3 py-2 transition-all duration-200 border border-transparent hover:border-gray-200">
+                  <Avatar 
+                    icon={<UserOutlined />} 
+                    size="default"
+                    className="bg-gradient-to-br from-blue-500 to-purple-600"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-gray-800 text-sm font-medium leading-tight">{userName}</span>
+                    <span className="text-gray-500 text-xs leading-tight">{userRole}</span>
+                  </div>
+                  <span className="text-gray-400 text-xs">▼</span>
                 </div>
               </Dropdown>
             </div>
@@ -229,7 +247,7 @@ export default function MainLayout() {
         </header>
 
         {/* 主内容区域 */}
-        <main className="flex-1 bg-[#f7f8fa] p-6 pt-[130px]">
+        <main className="flex-1 bg-[#f7f8fa] p-6 pt-[150px]">
           <div className="bg-white rounded-lg shadow-sm mx-auto" style={{minHeight: 'calc(100vh - 200px)' }}>
             <div className="p-8">
               <Outlet />

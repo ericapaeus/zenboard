@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from models.user import User
-from api.schemas.user import UserUpdate, UserResponse
+from api.schemas.user import UserUpdate, UserResponse, UserStatus
 import logging
 
 logger = logging.getLogger(__name__)
@@ -29,9 +29,10 @@ class UserService:
         return [
             UserResponse(
                 id=user.id,
-                username=user.username,
                 email=user.email,
-                nickname=user.nickname,
+                name=user.name,
+                phone=user.phone,
+                role=user.role,
                 status=user.status,
                 avatar=user.avatar,
                 hire_date=user.hire_date,
@@ -43,15 +44,18 @@ class UserService:
         ]
 
     async def update_user(self, user_id: int, user_update: UserUpdate) -> UserResponse:
-        """更新用户信息"""
+        """
+        更新用户信息
+        """
         user = self.db.query(User).filter(User.id == user_id).first()
         if not user:
             raise ValueError("用户不存在")
         
         # 更新字段
-        update_data = user_update.model_dump(exclude_unset=True)
+        update_data = user_update.dict(exclude_unset=True)
         for field, value in update_data.items():
-            setattr(user, field, value)
+            if hasattr(user, field):
+                setattr(user, field, value)
         
         user.updated_at = datetime.utcnow()
         self.db.commit()
@@ -59,9 +63,10 @@ class UserService:
         
         return UserResponse(
             id=user.id,
-            username=user.username,
             email=user.email,
-            nickname=user.nickname,
+            name=user.name,
+            phone=user.phone,
+            role=user.role,
             status=user.status,
             avatar=user.avatar,
             hire_date=user.hire_date,
@@ -76,19 +81,20 @@ class UserService:
         if not user:
             raise ValueError("用户不存在")
         
-        if user.status != "pending":
-            raise ValueError("用户状态不是待审批")
+        if user.status != UserStatus.PENDING:
+            raise ValueError("用户状态不是未审核")
         
-        user.status = "active"
+        user.status = UserStatus.ACTIVE
         user.updated_at = datetime.utcnow()
         self.db.commit()
         self.db.refresh(user)
         
         return UserResponse(
             id=user.id,
-            username=user.username,
             email=user.email,
-            nickname=user.nickname,
+            name=user.name,
+            phone=user.phone,
+            role=user.role,
             status=user.status,
             avatar=user.avatar,
             hire_date=user.hire_date,
@@ -104,15 +110,16 @@ class UserService:
         users = self.db.query(User).filter(
             User.contract_expiry <= expiry_date,
             User.contract_expiry >= datetime.utcnow(),
-            User.status == "active"
+            User.status == UserStatus.ACTIVE
         ).all()
         
         return [
             UserResponse(
                 id=user.id,
-                username=user.username,
                 email=user.email,
-                nickname=user.nickname,
+                name=user.name,
+                phone=user.phone,
+                role=user.role,
                 status=user.status,
                 avatar=user.avatar,
                 hire_date=user.hire_date,

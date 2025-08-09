@@ -5,6 +5,7 @@ from jose import JWTError, jwt
 from fastapi import HTTPException, status
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from models.user import User
+from api.schemas.user import UserStatus
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,11 +38,10 @@ class AuthService:
         if user:
             return user
 
-        # 创建新用户（微信登录默认激活）
+        # 创建新用户（微信登录默认为未审核状态）
         user = User(
-            nickname=name or "微信用户",
             openid=openid,
-            status="active",
+            status=UserStatus.PENDING,
         )
         db.add(user)
         db.commit()
