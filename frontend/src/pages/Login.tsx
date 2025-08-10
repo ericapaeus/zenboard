@@ -1,19 +1,13 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Spin, message } from "antd";
-import { QrcodeOutlined } from "@ant-design/icons";
-import { wechatAuthApi, authApi } from "@/services/api";
 import { QRCode } from "antd";
+import { appConfig } from "@/config/app";
+import { useQRCode, useQRCodePolling, useLoginFlow } from "@/hooks/useApi";
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [isLoading, setIsLoading] = useState(false);
-  const [qrData, setQrData] = useState<{ url: string; key: string } | null>(null);
-  const [polling, setPolling] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isExpired, setIsExpired] = useState(false);
-  const [scanStatus, setScanStatus] = useState<'pending' | 'scanned' | 'success' | 'expired'>('pending');
   const hasInitialized = useRef(false);
 
   // 获取用户原来想访问的页面
@@ -23,161 +17,146 @@ export default function Login() {
   };
 
   // 处理登录成功后的跳转
-  const handleLoginSuccess = (userStatus: string) => {
-    const redirectPath = getRedirectPath();
-    
-    if (userStatus === "未审核") {
-      message.success("登录成功！请完善个人资料");
-      navigate("/complete-profile");
-    } else if (userStatus === "待审核") {
-      message.success("登录成功！请等待审核");
-      navigate("/pending-review");
-    } else if (userStatus === "已通过") {
-      message.success("登录成功！");
-      navigate(redirectPath);
-    } else {
-      message.error("账户状态异常，请联系管理员");
-      navigate("/login");
+  const handleLoginSuccess = (path: string, redirectPath?: string) => {
+    console.log("handleLoginSuccess 被调用，跳转路径:", path, "重定向路径:", redirectPath);
+    navigate(path);
+  };
+
+  // 处理扫码成功
+  const handleScanSuccess = async (code: string) => {
+    try {
+      // 使用统一的登录流程 hook，传递重定向路径
+      const redirectPath = getRedirectPath();
+      await executeLoginFlow(code, redirectPath);
+    } catch (error) {
+      console.error("登录流程失败:", error);
+      // 错误提示已在 hook 中处理
+      resetStatus();
     }
   };
 
-  // 获取二维码和key
-  const fetchQRCode = async () => {
-    setIsLoading(true);
-    try {
-      const res = await wechatAuthApi.generate();
-      if (res.success) {
-      console.log("获取二维码成功:", res.data)
-        setQrData({ url: (res.data as { url: string; key: string }).url, key: (res.data as { url: string; key: string }).key });
-        console.log("设置的key:", (res.data as { url: string; key: string }).key);
-      } else {
-        message.error(res.message || "获取二维码失败");
-      }
-    } catch (error) {
-      console.error("获取二维码失败:", error);
-      if (error instanceof Error && error.message.includes('超时')) {
-        message.error("网络连接超时，请检查网络后重试");
-      } else {
-        message.error("获取二维码失败，请重试");
-      }
-    }
-    setIsLoading(false);
+  // 处理已拒绝状态
+  const handleRejected = () => {
+    // 重置扫码状态，避免显示"正在登录中..."
+    resetStatus();
+    // 重新获取二维码，让用户可以重新扫码
+    fetchQRCode();
   };
 
-  // 刷新二维码
-  const refreshQRCode = async () => {
-    if (isRefreshing) return; // 防抖
-    
-    setIsRefreshing(true);
-    setPolling(false); // 停止当前轮询
-    setQrData(null); // 清空旧的二维码数据
-    setIsExpired(false); // 重置过期状态
-    setScanStatus('pending'); // 重置扫码状态
-    hasInitialized.current = false; // 重置初始化标志
-    
-    try {
-      await fetchQRCode();
-      message.success("二维码已刷新");
-    } catch (error) {
-      console.error("刷新二维码失败:", error);
-      message.error("刷新失败，请重试");
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  // 使用自定义 hooks
+  const { 
+    qrData, 
+    loading: qrLoading, 
+    error: qrError, 
+    fetchQRCode, 
+    refreshQRCode: refreshQRCodeHook 
+  } = useQRCode();
+  
+  const { 
+    polling, 
+    scanStatus, 
+    isExpired, 
+    error: pollingError, 
+    startPolling, 
+    resetStatus,
+    setIsExpired,
+    setPolling,
+    stopPolling 
+  } = useQRCodePolling(qrData, handleScanSuccess);
+  
+  // 使用统一的登录流程 hook
+  const { executeLoginFlow, loading: loginLoading, error: loginError } = useLoginFlow(handleLoginSuccess, handleRejected);
 
   // 轮询扫码状态
   useEffect(() => {
     if (!qrData?.key) return;
-    setPolling(true);
-    const timer = setInterval(async () => {
-      try {
-        console.log("轮询使用的key:", qrData.key);
-        const res = await wechatAuthApi.getStatus(qrData.key);
-        const status = (res.data as { status: string }).status;
-        
-        // 根据状态设置扫码状态
-        if (status === "scanned") {
-          setScanStatus('scanned');
-        } else if (status === "success") {
-          setScanStatus('success');
-          // 扫码成功，立即停止轮询
-          setPolling(false);
-          clearInterval(timer);
-          
-          // 获取 openid 并登录
-          const code = (res.data as { code: string }).code;
-          console.log("扫码成功，获取到 code:", code);
-          
-          const loginRes = await wechatAuthApi.getOpenid(code);
-          if (loginRes.success) {
-            localStorage.setItem("isLogin", "1");
-            localStorage.setItem("access_token", (loginRes.data as { access_token: string }).access_token);
-            
-            // 获取用户信息
-            try {
-              const userRes = await authApi.getCurrentUser();
-              if (userRes.success) {
-                localStorage.setItem("userInfo", JSON.stringify(userRes.data));
-                
-                // 根据用户状态跳转到不同页面
-                handleLoginSuccess(userRes.data.status);
-              } else {
-                message.error("获取用户信息失败");
-              }
-            } catch (userError) {
-              console.error("获取用户信息失败:", userError);
-              message.error("获取用户信息失败，但登录成功");
-            navigate("/");
-            }
-          } else {
-            message.error(loginRes.message || "登录失败");
-          }
-        } else if (status === "expired") {
-          setScanStatus('expired');
-          setPolling(false);
-          setIsExpired(true);
-          clearInterval(timer);
-        }
-      } catch (error) {
-        console.error("轮询扫码状态失败:", error);
-        // 如果是超时错误，可以考虑停止轮询
-        if (error instanceof Error && error.message.includes('超时')) {
-          console.warn("轮询超时，可能需要刷新二维码");
-        }
-        // 如果是404错误（二维码过期），设置过期状态
-        if (error instanceof Error && error.message.includes('404')) {
-          console.warn("二维码已过期");
-          setPolling(false);
-          setIsExpired(true);
-          setScanStatus('expired');
-          clearInterval(timer);
-        }
-      }
-    }, 2000);
     
-    // 60秒超时
+    const cleanup = startPolling();
+    
+    // 5秒超时（测试用）
     const timeoutId = setTimeout(() => {
-      setPolling(false);
+      // 设置过期状态，这样遮层就能正确显示
       setIsExpired(true);
-      setScanStatus('expired');
-      clearInterval(timer);
+      // 确保轮询状态被重置，这样刷新按钮就不会被禁用
+      setPolling(false);
+      // 立即停止轮询，防止继续调用接口
+      if (cleanup && typeof cleanup === 'function') {
+        cleanup();
+      }
       message.error("二维码已过期，请刷新重试");
     }, 60000);
     
     return () => {
-      setPolling(false);
-      clearInterval(timer);
+      // 组件卸载或依赖变化时清理
+      if (cleanup && typeof cleanup === 'function') {
+        cleanup();
+      }
       clearTimeout(timeoutId);
     };
-  }, [qrData?.key, navigate]);
+  }, [qrData?.key, startPolling, setIsExpired, setPolling]);
 
+  // 监听过期状态，确保过期后停止轮询
+  useEffect(() => {
+    if (isExpired && qrData?.key) {
+      // 二维码过期后，强制停止轮询
+      const cleanup = startPolling();
+      if (cleanup && typeof cleanup === 'function') {
+        cleanup();
+      }
+      setPolling(false);
+    }
+  }, [isExpired, qrData?.key, startPolling, setPolling]);
+
+  // 监听扫码状态变化
+  useEffect(() => {
+    if (scanStatus === 'success' && qrData?.key) {
+      // 这里需要从轮询结果中获取 code，我们需要修改 useQRCodePolling hook
+      // 暂时保持原有的轮询逻辑
+    }
+  }, [scanStatus, qrData?.key]);
+
+  // 初始化获取二维码
   useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
       fetchQRCode();
     }
-  }, []);
+  }, [fetchQRCode]);
+
+  // 错误处理
+  useEffect(() => {
+    if (qrError) {
+      message.error(qrError);
+    }
+    if (pollingError) {
+      message.error(pollingError);
+    }
+    if (loginError) {
+      // 登录错误提示已在 hook 中处理，这里不需要重复显示
+    }
+  }, [qrError, pollingError, loginError]);
+
+  // 计算加载状态
+  const isLoading = qrLoading || loginLoading;
+
+  // 处理刷新二维码
+  const handleRefreshQRCode = async () => {
+    // 只有在过期状态下才允许刷新
+    if (!isExpired) {
+      message.warning("二维码尚未过期，无需刷新");
+      return;
+    }
+    
+    try {
+      // 重置所有状态
+      resetStatus();
+      // 获取新的二维码
+      await fetchQRCode();
+      message.success("二维码已刷新");
+    } catch (error) {
+      message.error("刷新二维码失败，请重试");
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden">
@@ -191,13 +170,15 @@ export default function Login() {
       <div className="relative z-10 bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4">
         {/* Logo 和标题 */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <QrcodeOutlined className="text-white text-2xl" />
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            ZenBoard
+            {appConfig.app.fullName}
           </h1>
-          <p className="text-gray-500 mt-2">团队协作平台</p>
+          <p className="text-gray-500 mt-2">{appConfig.app.englishName}</p>
         </div>
 
         {/* 扫码登录 */}
@@ -206,7 +187,7 @@ export default function Login() {
             <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-gray-100">
               {qrData && typeof qrData.url === 'string' && qrData.url.length > 0 ? (
                 <div 
-                  onClick={refreshQRCode}
+                  onClick={handleRefreshQRCode}
                   className="cursor-pointer hover:opacity-80 transition-opacity"
                   title="点击刷新二维码"
                 >
@@ -256,8 +237,8 @@ export default function Login() {
           <div className="mt-4 space-y-2">
             <p className="text-gray-600 text-sm">使用手机扫描二维码登录</p>
             <button
-              onClick={refreshQRCode}
-              disabled={isLoading || polling || isRefreshing}
+              onClick={handleRefreshQRCode}
+              disabled={isLoading || !isExpired}
               className="text-blue-600 text-sm hover:text-blue-700 disabled:opacity-50"
             >
               刷新二维码
@@ -278,7 +259,7 @@ export default function Login() {
 
       {/* 页脚 */}
       <div className="relative z-10 mt-8 text-gray-400 text-sm select-none">
-        © 2025 万店盈利公司 版权所有
+        © {appConfig.company.copyrightYear} {appConfig.company.name} 版权所有
       </div>
 
       {/* 添加动画样式 */}

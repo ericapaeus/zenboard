@@ -38,7 +38,8 @@ class User(Base):
     created_tasks = relationship("Task", foreign_keys="Task.creator_id", back_populates="creator")
     diary_entries = relationship("DiaryEntry", back_populates="author")
     comments = relationship("Comment", back_populates="author")
-    login_sessions = relationship("LoginSession", back_populates="user")
+    # 文档关系（与 Document.author back_populates 匹配）
+    documents = relationship("Document", back_populates="author", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, openid='{self.openid}')>" 

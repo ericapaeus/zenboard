@@ -1,3 +1,6 @@
+import React from 'react';
+import { appConfig } from '@/config/app';
+
 export default function Dashboard() {
   return (
     <>
@@ -27,13 +30,18 @@ export default function Dashboard() {
       {/* 欢迎区域 */}
       <div className="relative text-center py-12">
         <h1 className="text-4xl font-bold text-gray-800 mb-4">欢迎您登录系统！</h1>
-        <p className="text-xl text-gray-600 mb-8">高效的项目管理和团队协作平台</p>
+        <p className="text-xl text-gray-600 mb-8">{appConfig.app.description}</p>
         
         {/* 系统信息 */}
         <div className="mt-16 text-gray-500">
-          <p className="text-sm">ZenBoard v1.0.0 | 让工作更高效</p>
-            </div>
-          </div>
+          <p className="text-sm">{appConfig.app.name} v{appConfig.app.version} | {appConfig.app.slogan}</p>
+        </div>
+      </div>
+
+      {/* 版权信息 */}
+      <div className="absolute bottom-4 left-0 right-0 text-center">
+        <p className="text-gray-400 text-sm select-none">© {appConfig.company.copyrightYear} {appConfig.company.name} 版权所有</p>
+      </div>
     </>
   );
 }

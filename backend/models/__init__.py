@@ -4,7 +4,8 @@ from .task import Task
 from .diary import DiaryEntry
 from .comment import Comment
 from .project_membership import ProjectMembership
-from .login_session import LoginSession
+from .document import Document
+from .document_comment import DocumentComment
 
 __all__ = [
     "User",
@@ -13,5 +14,6 @@ __all__ = [
     "DiaryEntry",
     "Comment",
     "ProjectMembership",
-    "LoginSession"
+    "Document",
+    "DocumentComment",
 ] 

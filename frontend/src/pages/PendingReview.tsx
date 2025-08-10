@@ -2,48 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { Card, Result, Button, Spin, message } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { authApi, type User } from '@/services/api';
+import { useCheckUserStatus } from '@/hooks/useApi';
 
 export default function PendingReview() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [userInfo, setUserInfo] = useState<User | null>(null);
+  const { checkUserStatus, loading, userInfo, setUserInfo } = useCheckUserStatus();
 
   // 检查用户状态
-  const checkUserStatus = async () => {
-    setLoading(true);
+  const handleCheckUserStatus = async () => {
     try {
-      const res = await authApi.getCurrentUser();
-      if (res.success) {
-        setUserInfo(res.data);
-        
-        // 根据状态进行不同处理
-        if (res.data.status === "已通过") {
-          message.success("审核通过！欢迎使用系统");
-          navigate("/");
-        } else if (res.data.status === "已拒绝") {
-          message.error("审核未通过，请联系管理员");
-          navigate("/complete-profile");
-        }
-        // 如果是"待审核"状态，继续显示等待页面
+      const user = await checkUserStatus();
+      
+      // 根据状态进行不同处理
+      if (user.status === "已通过") {
+        // 不显示消息，直接跳转，让 ProtectedRoute 处理
+        navigate("/");
+        return;
+      } else if (user.status === "已拒绝") {
+        message.error("审核未通过，请联系管理员");
+        navigate("/complete-profile");
+        return;
       }
+      // 如果是"待审核"状态，继续显示等待页面
     } catch (error) {
+      // 错误处理已经在 hook 中完成
       console.error("检查用户状态失败:", error);
-      message.error("检查状态失败");
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    checkUserStatus();
+    handleCheckUserStatus();
     // 每30秒检查一次状态
-    const interval = setInterval(checkUserStatus, 30000);
+    const interval = setInterval(handleCheckUserStatus, 30000);
     return () => clearInterval(interval);
   }, [navigate]);
 
   const handleRefresh = () => {
-    checkUserStatus();
+    handleCheckUserStatus();
   };
 
   const handleLogout = () => {

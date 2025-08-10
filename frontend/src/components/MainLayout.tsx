@@ -1,46 +1,134 @@
 import Sidebar from "./Sidebar";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Breadcrumb, Tabs, Avatar, Dropdown, Space } from "antd";
-import { UserOutlined, SettingOutlined, LogoutOutlined, TranslationOutlined, FullscreenOutlined, FullscreenExitOutlined } from "@ant-design/icons";
+import { Breadcrumb, Tabs, Avatar, Dropdown, Space, ConfigProvider, theme } from "antd";
+import { UserOutlined, SettingOutlined, LogoutOutlined, TranslationOutlined, FullscreenOutlined, FullscreenExitOutlined, MenuUnfoldOutlined, MenuFoldOutlined } from "@ant-design/icons";
 import { useState, useCallback, useEffect } from "react";
-import { routes } from '../routes';
-import type { RouteConfig } from '../routes';
+import { DesktopOutlined, SunOutlined, MoonOutlined } from '@ant-design/icons';
+import { routes, type RouteConfig } from '../routes';
+import { appConfig } from '@/config/app';
 
-function findRouteByPath(path: string, routes: RouteConfig[]): RouteConfig | undefined {
-  for (const route of routes) {
-    if (route.path === path) return route;
-    if (route.children) {
-      const found = findRouteByPath(path, route.children);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
+// 简化的路由标签映射
+const routeLabels: Record<string, string> = {
+  '/': '首页',
+  '/users': '用户管理',
+  '/users/list': '用户列表',
+  '/projects/list': '项目列表',
+  '/tasks/list': '任务列表',
+  '/document/list': '文档列表',
+  '/settings/system': '系统配置',
+  '/profile': '个人资料',
+};
 
+// 获取面包屑项
 function getBreadcrumbItems(pathname: string) {
-  const segments = pathname.split('/').filter(Boolean);
   const items = [{ title: '首页' }];
-  let currentPath = '';
-  for (const segment of segments) {
-    currentPath += `/${segment}`;
-    const route = findRouteByPath(currentPath, routes);
-    if (route) {
-      items.push({ title: route.label });
-    }
+  
+  // 特殊处理各种列表路径，显示完整的三级路径
+  if (pathname === '/users/list') {
+    items.push({ title: '用户管理' });
+    items.push({ title: '用户列表' });
+    return items;
   }
+  
+  if (pathname === '/projects/list') {
+    items.push({ title: '任务管理' });
+    items.push({ title: '项目列表' });
+    return items;
+  }
+  
+  if (pathname === '/tasks/list') {
+    items.push({ title: '任务管理' });
+    items.push({ title: '任务列表' });
+    return items;
+  }
+  
+  if (pathname === '/document/list') {
+    items.push({ title: '文档管理' });
+    items.push({ title: '文档列表' });
+    return items;
+  }
+  
+  if (pathname === '/settings/system') {
+    items.push({ title: '系统设置' });
+    items.push({ title: '系统配置' });
+    return items;
+  }
+  
+  // 根据路径获取标签
+  const label = routeLabels[pathname];
+  if (label && label !== '首页') {
+    items.push({ title: label });
+  }
+  
   return items;
 }
 
-// 新增：根据 path 动态获取标签页 label
-function getTabLabelByPath(path: string): string {
-  const route = findRouteByPath(path, routes);
-  return route ? route.label : '未知页面';
+// 获取标签页标签和图标
+function getTabLabelByPath(path: string): React.ReactNode {
+  const label = routeLabels[path];
+  if (!label) return '未知页面';
+  
+  // 从路由配置中获取图标
+  let icon = null;
+  
+  // 查找路由配置
+  const findRouteIcon = (routes: RouteConfig[], targetPath: string): React.ReactNode | null => {
+    for (const route of routes) {
+      if (route.path === targetPath) {
+        return route.icon || null;
+      }
+      if (route.children) {
+        const found = findRouteIcon(route.children, targetPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  
+  icon = findRouteIcon(routes, path);
+  
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {icon && <span className="text-gray-500">{icon}</span>}
+      <span>{label}</span>
+    </span>
+  );
 }
 
 export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // 主题模式：system | light | dark
+  const THEME_STORAGE_KEY = 'themeMode';
+  const getInitialThemeMode = (): 'system' | 'light' | 'dark' => {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY) as 'system' | 'light' | 'dark' | null;
+    return saved || 'system';
+  };
+  const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>(getInitialThemeMode());
+  const mediaQuery = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(mediaQuery ? mediaQuery.matches : false);
+  useEffect(() => {
+    if (!mediaQuery) return;
+    const handler = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
+    mediaQuery.addEventListener?.('change', handler);
+    return () => mediaQuery.removeEventListener?.('change', handler);
+  }, []);
+  const isDark = themeMode === 'dark' || (themeMode === 'system' && systemPrefersDark);
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
+  const handleThemeChange = ({ key }: { key: string }) => {
+    const mode = key as 'system' | 'light' | 'dark';
+    setThemeMode(mode);
+    localStorage.setItem(THEME_STORAGE_KEY, mode);
+  };
+  const themeMenuItems = [
+    { key: 'system', icon: <DesktopOutlined />, label: '跟随系统' },
+    { key: 'light', icon: <SunOutlined />, label: '浅色模式' },
+    { key: 'dark', icon: <MoonOutlined />, label: '深色模式' },
+  ];
   
   // 获取用户信息
   const getUserInfo = () => {
@@ -56,10 +144,11 @@ export default function MainLayout() {
   const userInfo = getUserInfo();
   const userName = userInfo?.name || '管理员';
   const userRole = userInfo?.role || '管理员';
+  const userAvatar = userInfo?.avatar; // 获取用户头像
   
   // 动态标签页
-  const [tabs, setTabs] = useState([
-    { key: "/", label: "首页", closable: false }
+  const [tabs, setTabs] = useState<{ key: string; label: React.ReactNode; closable: boolean }[]>([
+    { key: "/", label: getTabLabelByPath('/'), closable: false }
   ]);
   const [activeTab, setActiveTab] = useState("/");
 
@@ -104,6 +193,21 @@ export default function MainLayout() {
     setActiveTab(key);
     navigate(key);
   }, [navigate]);
+
+  // 路由变化时自动创建标签页
+  useEffect(() => {
+    const currentPath = location.pathname;
+    if (currentPath === '/') return; // 首页不需要创建标签页
+    
+    setTabs((prevTabs) => {
+      if (prevTabs.find((tab) => tab.key === currentPath)) return prevTabs;
+      return [
+        ...prevTabs,
+        { key: currentPath, label: getTabLabelByPath(currentPath), closable: currentPath !== "/" }
+      ];
+    });
+    setActiveTab(currentPath);
+  }, [location.pathname]);
 
   // 标签页切换
   const handleTabChange = (key: string) => {
@@ -164,7 +268,8 @@ export default function MainLayout() {
       localStorage.removeItem("isLogin");
       navigate("/login");
     } else if (key === "profile") {
-      navigate("/settings/profile");
+      // 跳转到个人资料页面，使用独立路径
+      navigate("/profile");
     }
   };
 
@@ -176,14 +281,32 @@ export default function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen font-sans bg-gray-50 text-[#1D2129] overflow-x-hidden">
-      <Sidebar onMenuClick={handleMenuClick} />
-      <div className="flex-1 ml-64 flex flex-col">
+    <ConfigProvider theme={{ algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm }}>
+    <div className="flex h-screen font-sans overflow-x-hidden" style={{ backgroundColor: isDark ? '#0b1220' : '#f5f6f8', color: isDark ? '#e5e7eb' : '#1D2129' }}>
+      <Sidebar 
+        onMenuClick={handleMenuClick} 
+        collapsed={sidebarCollapsed}
+      />
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         {/* 顶部导航栏 */}
-        <header className="fixed top-0 left-64 right-0 z-20 bg-white shadow-sm border-b px-6 py-3">
+        <header className="fixed top-0 right-0 z-20 shadow-sm border-b px-6 py-3 transition-all duration-300" style={{ left: sidebarCollapsed ? '64px' : '256px', backgroundColor: isDark ? '#111827' : '#ffffff', borderColor: isDark ? '#1f2937' : '#f0f0f0' }}>
           <div className="flex items-center justify-between">
-            {/* 左侧面包屑 */}
-            <div className="flex-1">
+            {/* 左侧面包屑和收缩按钮 */}
+            <div className="flex items-center">
+              {/* 侧边栏收缩按钮 */}
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200 mr-3 focus:outline-none"
+                title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+              >
+                {sidebarCollapsed ? (
+                  <MenuUnfoldOutlined className="text-gray-600 text-base" />
+                ) : (
+                  <MenuFoldOutlined className="text-gray-600 text-base" />
+                )}
+              </button>
+              
+              {/* 面包屑 */}
               <Breadcrumb 
                 items={getBreadcrumbItems(location.pathname)} 
                 className="text-sm"
@@ -194,14 +317,24 @@ export default function MainLayout() {
             <div className="flex items-center space-x-4">
               {/* 操作按钮 */}
               <Space size="small">
+                {/* 主题切换 */}
+                <Dropdown menu={{ items: themeMenuItems, onClick: handleThemeChange }} placement="bottomRight">
+                  <button className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200 focus:outline-none" title="主题模式">
+                    {themeMode === 'dark' || (themeMode === 'system' && systemPrefersDark) ? (
+                      <MoonOutlined className="text-gray-600 text-base" />
+                    ) : (
+                      <SunOutlined className="text-gray-600 text-base" />
+                    )}
+                  </button>
+                </Dropdown>
                 <Dropdown menu={{ items: actionMenuItems, onClick: handleActionMenuClick }} placement="bottomRight">
-                  <button className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200">
+                  <button className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200 focus:outline-none">
                     <TranslationOutlined className="text-gray-600 text-base" />
                   </button>
                 </Dropdown>
                 <button 
                   onClick={toggleFullscreen}
-                  className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200"
+                  className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200 focus:outline-none"
                   title={isFullscreen ? "退出全屏" : "进入全屏"}
                 >
                   {isFullscreen ? (
@@ -214,11 +347,12 @@ export default function MainLayout() {
               
               {/* 用户头像和下拉菜单 */}
               <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
-                <div className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 rounded-lg px-3 py-2 transition-all duration-200 border border-transparent hover:border-gray-200">
+                <div className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 rounded-lg px-3 py-2 transition-all duration-200 border border-transparent hover:border-gray-200 focus:outline-none">
                   <Avatar 
-                    icon={<UserOutlined />} 
+                    src={userAvatar ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${userAvatar}` : undefined}
+                    icon={!userAvatar ? <UserOutlined /> : undefined}
                     size="default"
-                    className="bg-gradient-to-br from-blue-500 to-purple-600"
+                    className={!userAvatar ? "bg-gradient-to-br from-blue-500 to-purple-600" : ""}
                   />
                   <div className="flex flex-col">
                     <span className="text-gray-800 text-sm font-medium leading-tight">{userName}</span>
@@ -247,17 +381,18 @@ export default function MainLayout() {
         </header>
 
         {/* 主内容区域 */}
-        <main className="flex-1 bg-[#f7f8fa] p-6 pt-[150px]">
-          <div className="bg-white rounded-lg shadow-sm mx-auto" style={{minHeight: 'calc(100vh - 200px)' }}>
+        <main className="flex-1 p-6 pt-[150px]" style={{ backgroundColor: isDark ? '#0b1220' : '#f7f8fa' }}>
+          <div className="rounded-lg shadow-sm mx-auto" style={{minHeight: 'calc(100vh - 200px)', backgroundColor: isDark ? '#111827' : '#ffffff' }}>
             <div className="p-8">
               <Outlet />
             </div>
           </div>
           <footer className="w-full text-center text-gray-400 text-sm py-4 select-none">
-            © 2025 万店盈利公司 版权所有
+            © {appConfig.company.copyrightYear} {appConfig.company.name} 版权所有
           </footer>
         </main>
       </div>
     </div>
+    </ConfigProvider>
   );
 }

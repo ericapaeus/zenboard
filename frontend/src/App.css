@@ -354,3 +354,44 @@ body {
   font-family: 'Font Awesome 6 Brands';
   font-weight: 400;
 }
+
+/* 收缩按钮专门样式 */
+.sidebar-toggle-btn {
+  transition: all 0.2s ease-in-out;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.sidebar-toggle-btn:hover {
+  background-color: #f3f4f6 !important;
+  transform: scale(1.05);
+}
+
+.sidebar-toggle-btn:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.sidebar-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+/* 全局移除所有按钮的焦点边框 */
+button:focus {
+  outline: none !important;
+}
+
+button:focus-visible {
+  outline: none !important;
+}
+
+/* 移除所有可点击元素的焦点边框 */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: none;
+}

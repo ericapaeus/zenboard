@@ -3,7 +3,7 @@ import { Form, Input, Button, DatePicker, message, Card, Avatar } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { authApi } from '@/services/api';
+import { useUpdateProfile } from '@/hooks/useApi';
 
 interface ProfileData {
   name: string;
@@ -30,25 +30,34 @@ interface UserInfo {
 export default function CompleteProfile() {
   const [form] = Form.useForm();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  
+  // 使用 useUpdateProfile hook
+  const { updateProfile, loading } = useUpdateProfile();
 
   // 获取当前用户信息
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        const res = await authApi.getCurrentUser();
-        if (res.success) {
-          setUserInfo(res.data);
+        // 从 localStorage 获取用户信息
+        const storedUserInfo = localStorage.getItem("userInfo");
+        if (storedUserInfo) {
+          const user = JSON.parse(storedUserInfo);
+          setUserInfo(user);
+          
           // 如果用户状态不是"未审核"，跳转到首页
-          if (res.data.status !== "未审核") {
+          if (user.status !== "未审核") {
             navigate("/");
             return;
           }
+        } else {
+          // 如果没有存储的用户信息，跳转到登录页
+          navigate("/login");
         }
       } catch (error) {
         console.error("获取用户信息失败:", error);
         message.error("获取用户信息失败");
+        navigate("/login");
       }
     };
 
@@ -56,7 +65,6 @@ export default function CompleteProfile() {
   }, [navigate]);
 
   const handleSubmit = async (values: ProfileData & { contractStartDate?: dayjs.Dayjs; contractEndDate?: dayjs.Dayjs }) => {
-    setLoading(true);
     try {
       const updateData = {
         name: values.name,
@@ -67,22 +75,18 @@ export default function CompleteProfile() {
         status: "待审核" // 提交后状态变为待审核
       };
 
-      const res = await authApi.updateProfile(updateData);
+      const res = await updateProfile(updateData);
       if (res.success) {
-        message.success("资料提交成功，请等待管理员审核");
+        // 移除重复的成功消息，因为 useUpdateProfile hook 已经显示了
         // 更新本地存储的用户信息
         const updatedUserInfo = { ...userInfo, ...updateData, status: "待审核" };
         localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
         // 跳转到等待审核页面
         navigate("/pending-review");
-      } else {
-        message.error(res.message || "提交失败");
       }
     } catch (error) {
+      // 错误处理已经在 useUpdateProfile hook 中完成
       console.error("提交资料失败:", error);
-      message.error("提交失败，请重试");
-    } finally {
-      setLoading(false);
     }
   };
 

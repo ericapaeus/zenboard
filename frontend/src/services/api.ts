@@ -62,6 +62,28 @@ export interface Contract {
   updated_at: string;
 }
 
+// 文档（对应后端 /documents）
+export interface Document {
+  id: number;
+  title: string;
+  content: string;
+  visibility: 'public' | 'project' | 'specific' | 'private';
+  author_id: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentComment {
+  id: number;
+  document_id: number;
+  author_id: number;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  author_name?: string;
+  author_avatar?: string;
+}
+
 // 认证相关 API
 export const authApi = {
   // 二维码登录
@@ -101,8 +123,46 @@ export const authApi = {
     hire_date?: Date;
     contract_expiry?: Date;
     status?: string;
+    avatar?: string;
+    role?: string;
   }): Promise<ApiResponse<User>> => {
     return api.put('/api/auth/wechat/profile', data);
+  },
+
+  // 检查是否为系统首个用户
+  checkFirstUser: (): Promise<ApiResponse<{ isFirstUser: boolean }>> => {
+    return api.get('/api/auth/wechat/check-first-user');
+  },
+
+  // 获取用户列表
+  getUsers: (): Promise<ApiResponse<User[]>> => {
+    return api.get('/api/auth/wechat/users');
+  },
+
+  // 审批用户
+  approveUser: (userId: string): Promise<ApiResponse<{ user_id: number; status: string }>> => {
+    return api.post(`/api/auth/wechat/users/${userId}/approve`);
+  },
+
+  // 拒绝用户
+  rejectUser: (userId: string): Promise<ApiResponse<{ user_id: number; status: string }>> => {
+    return api.post(`/api/auth/wechat/users/${userId}/reject`);
+  },
+
+  // 更新用户信息
+  updateUser: (userId: number, data: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    hire_date?: string;
+    contract_expiry?: string;
+  }): Promise<ApiResponse<User>> => {
+    return api.put(`/api/auth/wechat/users/${userId}`, data);
+  },
+
+  // 删除用户
+  deleteUser: (userId: number): Promise<ApiResponse<{ user_id: number; deleted: boolean }>> => {
+    return api.delete(`/api/auth/wechat/users/${userId}`);
   },
 };
 
@@ -147,12 +207,12 @@ export const userApi = {
 
   // 更新用户
   updateUser: (id: string, userData: Partial<User>): Promise<ApiResponse<User>> => {
-    return api.put(`/api/users/${id}`, userData);
+    return api.put(`/api/auth/wechat/users/${id}`, userData);
   },
 
   // 删除用户
   deleteUser: (id: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/api/users/${id}`);
+    return api.delete(`/api/auth/wechat/users/${id}`);
   },
 
   // 更新用户状态
@@ -375,6 +435,36 @@ export const diaryApi = {
   },
 };
 
+// 文档系统 API（新）
+export const documentApi = {
+  // 获取文档列表
+  getDocuments: (params?: { skip?: number; limit?: number; author_id?: number; visibility?: 'public' | 'project' | 'specific' | 'private'; order_by?: string; }): Promise<ApiResponse<Document[]>> => {
+    const searchParams = new URLSearchParams();
+    if (params?.skip !== undefined) searchParams.append('skip', String(params.skip));
+    if (params?.limit !== undefined) searchParams.append('limit', String(params.limit));
+    if (params?.author_id !== undefined) searchParams.append('author_id', String(params.author_id));
+    if (params?.visibility !== undefined) searchParams.append('visibility', params.visibility);
+    if (params?.order_by !== undefined) searchParams.append('order_by', params.order_by);
+    const query = searchParams.toString();
+    return api.get(`/api/documents${query ? `?${query}` : ''}`);
+  },
+  // 获取文档详情
+  getDocument: (id: number): Promise<ApiResponse<Document>> => api.get(`/api/documents/${id}`),
+  // 创建文档
+  createDocument: (data: { title: string; content: string; visibility: 'public' | 'project' | 'specific' | 'private'; }): Promise<ApiResponse<Document>> => api.post('/api/documents', data),
+  // 更新文档
+  updateDocument: (id: number, data: Partial<{ title: string; content: string; visibility: 'public' | 'project' | 'specific' | 'private'; }>): Promise<ApiResponse<Document>> => api.put(`/api/documents/${id}`, data),
+  // 删除文档
+  deleteDocument: (id: number): Promise<ApiResponse<null>> => api.delete(`/api/documents/${id}`),
+};
+
+// 文档评论 API（新）
+export const documentCommentApi = {
+  listByDocument: (documentId: number): Promise<ApiResponse<DocumentComment[]>> => api.get(`/api/document-comments/by-document/${documentId}`),
+  addComment: (payload: { document_id: number; content: string; }): Promise<ApiResponse<DocumentComment>> => api.post('/api/document-comments', payload),
+  deleteComment: (commentId: number): Promise<ApiResponse<null>> => api.delete(`/api/document-comments/${commentId}`),
+};
+
 // 消息中心 API
 export const messageApi = {
   // 获取消息列表
@@ -428,4 +518,42 @@ export const wechatAuthApi = {
   // 凭 code 获取 openid 并登录
   getOpenid: (code: string) =>
     api.get(`/api/auth/wechat/openid?code=${code}`),
+};
+
+// 文件上传 API
+export const uploadApi = {
+  // 上传文件（通用）
+  uploadFile: (file: File, type: 'avatar' | 'document' | 'image' = 'image'): Promise<ApiResponse<{
+    url: string;
+    filename: string;
+    size: number;
+    type: string;
+  }>> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+    
+    // 注意：不要手动设置 Content-Type，让浏览器自动处理 multipart/form-data 的 boundary
+    return api.post('/api/upload/file', formData);
+  },
+
+  // 上传头像（专门用于头像上传）
+  uploadAvatar: (file: File): Promise<ApiResponse<{
+    url: string;
+    filename: string;
+    size: number;
+    type: string;
+  }>> => {
+    return uploadApi.uploadFile(file, 'avatar');
+  },
+
+  // 上传文档
+  uploadDocument: (file: File): Promise<ApiResponse<{
+    url: string;
+    filename: string;
+    size: number;
+    type: string;
+  }>> => {
+    return uploadApi.uploadFile(file, 'document');
+  },
 }; 

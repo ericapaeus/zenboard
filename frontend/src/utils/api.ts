@@ -56,9 +56,12 @@ const fetchBase = async (
 ): Promise<Response> => {
   const requestHeaders = new Headers(options?.headers);
 
-  // 设置默认 Content-Type
+  // 设置默认 Content-Type，但对于 FormData 不设置（让浏览器自动处理）
   if (!options?.headers || !(options.headers as Record<string, string>)['Content-Type']) {
-    requestHeaders.set('Content-Type', 'application/json');
+    // 如果 body 是 FormData，不设置 Content-Type
+    if (!(options?.body instanceof FormData)) {
+      requestHeaders.set('Content-Type', 'application/json');
+    }
   }
 
   // 创建 AbortController 用于超时控制
@@ -233,21 +236,21 @@ export const api = {
     apiRequest<T>(endpoint, {
       ...config,
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? (data instanceof FormData ? data : JSON.stringify(data)) : undefined,
     }),
 
   put: <T>(endpoint: string, data?: any, config?: RequestConfig) =>
     apiRequest<T>(endpoint, {
       ...config,
       method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? (data instanceof FormData ? data : JSON.stringify(data)) : undefined,
     }),
 
   patch: <T>(endpoint: string, data?: any, config?: RequestConfig) =>
     apiRequest<T>(endpoint, {
       ...config,
       method: 'PATCH',
-      body: data ? JSON.stringify(data) : undefined,
+      body: data ? (data instanceof FormData ? data : JSON.stringify(data)) : undefined,
     }),
 
   delete: <T>(endpoint: string, config?: RequestConfig) =>

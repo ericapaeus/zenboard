@@ -223,6 +223,20 @@ async def update_profile(
     更新当前用户的资料。
     """
     try:
+        # 检查邮箱唯一性（如果提供了新邮箱）
+        if user_update.email and user_update.email != current_user.email:
+            existing_user = db.query(User).filter(
+                User.email == user_update.email,
+                User.id != current_user.id
+            ).first()
+            if existing_user:
+                return ApiResponse(
+                    success=False,
+                    message="该邮箱已被其他用户使用，请使用其他邮箱",
+                    data=None,
+                    code=400
+                )
+        
         user_service = UserService(db)
         updated_user = await user_service.update_user(current_user.id, user_update)
         
@@ -237,6 +251,339 @@ async def update_profile(
         return ApiResponse(
             success=False,
             message=f"更新用户资料失败: {e}",
+            data=None,
+            code=500
+        ) 
+
+@router.get("/check-first-user", response_model=ApiResponse[dict], summary="检查是否为系统首个用户")
+async def check_first_user(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    检查当前用户是否为系统首个用户
+    """
+    try:
+        # 查询数据库中ID最小的用户
+        first_user = db.query(User).order_by(User.id.asc()).first()
+        
+        if not first_user:
+            # 如果数据库中没有用户，返回False
+            return ApiResponse(
+                success=True,
+                message="查询成功",
+                data={
+                    "isFirstUser": False
+                },
+                code=200
+            )
+        
+        # 判断当前用户是否是第一个用户（ID最小的用户）
+        is_first_user = current_user.id == first_user.id
+        
+        return ApiResponse(
+            success=True,
+            message="查询成功",
+            data={
+                "isFirstUser": is_first_user
+            },
+            code=200
+        )
+    except Exception as e:
+        logger.error(f"检查首个用户失败: {e}")
+        return ApiResponse(
+            success=False,
+            message=f"检查首个用户失败: {e}",
+            data=None,
+            code=500
+        ) 
+
+@router.get("/users", response_model=ApiResponse[list], summary="获取用户列表")
+async def get_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取用户列表，只有管理员可以访问
+    """
+    try:
+        # 检查当前用户是否为管理员
+        if current_user.role != "管理员":
+            return ApiResponse(
+                success=False,
+                message="权限不足，只有管理员可以查看用户列表",
+                data=None,
+                code=403
+            )
+        
+        # 查询所有用户
+        users = db.query(User).order_by(User.id.desc()).all()
+        
+        # 转换为响应格式
+        user_list = []
+        for user in users:
+            user_list.append({
+                "id": user.id,
+                "name": user.name,
+                "phone": user.phone,
+                "email": user.email,
+                "role": user.role,
+                "status": user.status,
+                "avatar": user.avatar,
+                "hire_date": user.hire_date.strftime("%Y-%m-%d") if user.hire_date else None,
+                "contract_expiry": user.contract_expiry.strftime("%Y-%m-%d") if user.contract_expiry else None,
+                "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S") if user.created_at else None,
+                "updated_at": user.updated_at.strftime("%Y-%m-%d %H:%M:%S") if user.updated_at else None
+            })
+        
+        return ApiResponse(
+            success=True,
+            message="获取用户列表成功",
+            data=user_list,
+            code=200
+        )
+    except Exception as e:
+        logger.error(f"获取用户列表失败: {e}")
+        return ApiResponse(
+            success=False,
+            message=f"获取用户列表失败: {e}",
+            data=None,
+            code=500
+        )
+
+@router.post("/users/{user_id}/approve", response_model=ApiResponse[dict], summary="审批用户")
+async def approve_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    审批用户，只有管理员可以操作
+    """
+    try:
+        # 检查当前用户是否为管理员
+        if current_user.role != "管理员":
+            return ApiResponse(
+                success=False,
+                message="权限不足，只有管理员可以审批用户",
+                data=None,
+                code=403
+            )
+        
+        # 查找要审批的用户
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return ApiResponse(
+                success=False,
+                message="用户不存在",
+                data=None,
+                code=404
+            )
+        
+        # 更新用户状态为已通过
+        user.status = "已通过"
+        db.commit()
+        
+        return ApiResponse(
+            success=True,
+            message="用户审批成功",
+            data={
+                "user_id": user_id,
+                "status": "已通过"
+            },
+            code=200
+        )
+    except Exception as e:
+        logger.error(f"审批用户失败: {e}")
+        return ApiResponse(
+            success=False,
+            message=f"审批用户失败: {e}",
+            data=None,
+            code=500
+        )
+
+@router.post("/users/{user_id}/reject", response_model=ApiResponse[dict], summary="拒绝用户")
+async def reject_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    拒绝用户，只有管理员可以操作
+    """
+    try:
+        # 检查当前用户是否为管理员
+        if current_user.role != "管理员":
+            return ApiResponse(
+                success=False,
+                message="权限不足，只有管理员可以拒绝用户",
+                data=None,
+                code=403
+            )
+        
+        # 查找要拒绝的用户
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return ApiResponse(
+                success=False,
+                message="用户不存在",
+                data=None,
+                code=404
+            )
+        
+        # 更新用户状态为已拒绝
+        user.status = "已拒绝"
+        db.commit()
+        
+        return ApiResponse(
+            success=True,
+            message="用户已拒绝",
+            data={
+                "user_id": user_id,
+                "status": "已拒绝"
+            },
+            code=200
+        )
+    except Exception as e:
+        logger.error(f"拒绝用户失败: {e}")
+        return ApiResponse(
+            success=False,
+            message=f"拒绝用户失败: {e}",
+            data=None,
+            code=500
+        ) 
+
+@router.put("/users/{user_id}", response_model=ApiResponse[UserResponse], summary="更新用户信息")
+async def update_user(
+    user_id: int,
+    user_update: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    更新用户信息，管理员可以更新任何用户，普通用户只能更新自己
+    """
+    try:
+        # 检查权限：管理员可以更新任何用户，普通用户只能更新自己
+        if current_user.role != "管理员" and current_user.id != user_id:
+            return ApiResponse(
+                success=False,
+                message="权限不足，只能更新自己的信息",
+                data=None,
+                code=403
+            )
+        
+        # 查找要更新的用户
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return ApiResponse(
+                success=False,
+                message="用户不存在",
+                data=None,
+                code=404
+            )
+        
+        # 检查邮箱唯一性（如果提供了新邮箱）
+        if user_update.email and user_update.email != user.email:
+            existing_user = db.query(User).filter(
+                User.email == user_update.email,
+                User.id != user_id
+            ).first()
+            if existing_user:
+                return ApiResponse(
+                    success=False,
+                    message="该邮箱已被其他用户使用，请使用其他邮箱",
+                    data=None,
+                    code=400
+                )
+        
+        # 更新用户信息
+        update_data = user_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            if hasattr(user, field):
+                setattr(user, field, value)
+        
+        # 更新修改时间
+        from datetime import datetime
+        user.updated_at = datetime.now()
+        
+        db.commit()
+        db.refresh(user)
+        
+        # 返回更新后的用户信息
+        return ApiResponse(
+            success=True,
+            message="用户信息更新成功",
+            data=UserResponse.from_orm(user),
+            code=200
+        )
+    except Exception as e:
+        logger.error(f"更新用户信息失败: {e}")
+        db.rollback()
+        return ApiResponse(
+            success=False,
+            message=f"更新用户信息失败: {e}",
+            data=None,
+            code=500
+        )
+
+@router.delete("/users/{user_id}", response_model=ApiResponse[dict], summary="删除用户")
+async def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    删除用户，只有管理员可以操作，且不能删除自己
+    """
+    try:
+        # 检查当前用户是否为管理员
+        if current_user.role != "管理员":
+            return ApiResponse(
+                success=False,
+                message="权限不足，只有管理员可以删除用户",
+                data=None,
+                code=403
+            )
+        
+        # 管理员不能删除自己
+        if current_user.id == user_id:
+            return ApiResponse(
+                success=False,
+                message="不能删除自己的账户",
+                data=None,
+                code=400
+            )
+        
+        # 查找要删除的用户
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return ApiResponse(
+                success=False,
+                message="用户不存在",
+                data=None,
+                code=404
+            )
+        
+        # 删除用户
+        db.delete(user)
+        db.commit()
+        
+        return ApiResponse(
+            success=True,
+            message="用户删除成功",
+            data={
+                "user_id": user_id,
+                "deleted": True
+            },
+            code=200
+        )
+    except Exception as e:
+        logger.error(f"删除用户失败: {e}")
+        db.rollback()
+        return ApiResponse(
+            success=False,
+            message=f"删除用户失败: {e}",
             data=None,
             code=500
         ) 
