@@ -1,88 +1,14 @@
 import { api } from '@/utils/api';
 import type { ApiResponse } from '@/utils/api';
-
-// 类型定义
-export interface User {
-  id: number;
-  email?: string;
-  name?: string;
-  phone?: string;
-  role: string;
-  status: '未审核' | '待审核' | '已通过' | '已拒绝';
-  avatar?: string;
-  hire_date?: string;
-  contract_expiry?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  status: 'active' | 'archived';
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: 'todo' | 'in_progress' | 'completed';
-  priority: 'low' | 'medium' | 'high';
-  assigned_to?: string;
-  project_id?: string;
-  parent_task_id?: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Diary {
-  id: string;
-  title: string;
-  content: string;
-  visibility: 'public' | 'project' | 'private' | 'members';
-  shared_with?: string[];
-  project_id?: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Contract {
-  id: string;
-  user_id: string;
-  hire_date: string;
-  expire_date: string;
-  status: 'active' | 'expired' | 'terminated';
-  created_at: string;
-  updated_at: string;
-}
-
-// 文档（对应后端 /documents）
-export interface Document {
-  id: number;
-  title: string;
-  content: string;
-  visibility: 'public' | 'project' | 'specific' | 'private';
-  author_id: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DocumentComment {
-  id: number;
-  document_id: number;
-  author_id: number;
-  content: string;
-  created_at: string;
-  updated_at: string;
-  author_name?: string;
-  author_avatar?: string;
-}
+import type { 
+  User, 
+  Project, 
+  Task, 
+  Diary, 
+  Contract, 
+  Document, 
+  DocumentComment 
+} from '@/types';
 
 // 认证相关 API
 export const authApi = {

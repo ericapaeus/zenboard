@@ -4,8 +4,8 @@ import { UserOutlined, TeamOutlined, FileTextOutlined, SettingOutlined, UserSwit
 // 懒加载页面组件
 const Dashboard = lazy(() => import('../pages/Dashboard'));
 const Users = lazy(() => import('../pages/Users'));
-const MyProjects = lazy(() => import('../pages/MyProjects'));
-const MyTasks = lazy(() => import('../pages/MyTasks'));
+const Projects = lazy(() => import('../pages/Projects'));
+const Task = lazy(() => import('../pages/Task'));
 const Document = lazy(() => import('../pages/Document'));
 const SystemConfig = lazy(() => import('../pages/SystemConfig'));
 const Profile = lazy(() => import('../pages/Profile'));
@@ -51,13 +51,13 @@ export const routes: RouteConfig[] = [
         path: '/projects/list',
         label: '项目列表',
         icon: React.createElement(ProjectOutlined),
-        meta: { parentPath: '/tasks', component: MyProjects },
+        meta: { parentPath: '/tasks', component: Projects },
       },
       {
         path: '/tasks/list',
         label: '任务列表',
         icon: React.createElement(CheckSquareOutlined),
-        meta: { component: MyTasks },
+        meta: { component: Task },
       }
     ],
   },
