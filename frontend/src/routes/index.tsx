@@ -25,7 +25,7 @@ export interface RouteConfig {
 export const routes: RouteConfig[] = [
   {
     path: '/',
-    label: '首页',
+    label: '工作台',
     icon: React.createElement(UserOutlined),
     meta: { component: Dashboard },
   },
@@ -131,4 +131,4 @@ export const getAllRoutePaths = (): Array<{ path: string; component: React.Compo
   
   extractPaths(routes);
   return paths;
-}; 
+};
