@@ -27,6 +27,7 @@ export const routes: RouteConfig[] = [
     path: '/',
     label: '控制台',
     icon: React.createElement(HomeOutlined),
+    meta: { component: Dashboard }
   },
   {
     path: '/users',
