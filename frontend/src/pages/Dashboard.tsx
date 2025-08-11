@@ -1,47 +1,43 @@
 import React from 'react';
-import { appConfig } from '@/config/app';
+import { Row, Col, Card, Typography } from 'antd';
+import Task from './Task'; // Import the Task component
+
+const { Title } = Typography;
 
 export default function Dashboard() {
+  const markdownContent = `
+# 通知和提醒
+
+## 2024年8月11日
+*   **系统维护通知：** ZenBoard 系统将于今晚 22:00 - 23:00 进行例行维护，期间部分服务可能受影响。请提前保存您的工作。
+*   **新功能上线：** 任务模块新增“子任务”功能，现在您可以在任务详情中添加和管理子任务了。
+
+## 2024年8月8日
+*   **项目进展提醒：** “ZenBoard 前端优化”项目已完成 80%，请相关负责人及时更新进度。
+*   **待处理任务：** 您有 3 项待处理任务已逾期，请尽快处理。
+
+## 2024年8月1日
+*   **欢迎使用 ZenBoard！** 这是您的工作台，您可以在这里查看待办任务和重要通知。
+`;
+
   return (
-    <>
-      {/* 背景装饰 */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* 渐变背景 */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50"></div>
-        
-        {/* 装饰性圆圈 */}
-        <div className="absolute top-20 left-20 w-32 h-32 bg-blue-200 rounded-full opacity-20 animate-pulse"></div>
-        <div className="absolute top-40 right-32 w-24 h-24 bg-purple-200 rounded-full opacity-30 animate-pulse" style={{animationDelay: '1s'}}></div>
-        <div className="absolute bottom-32 left-1/4 w-20 h-20 bg-green-200 rounded-full opacity-25 animate-pulse" style={{animationDelay: '2s'}}></div>
-        
-        {/* 装饰性线条 */}
-        <div className="absolute top-1/3 left-10 w-1 h-32 bg-gradient-to-b from-blue-400 to-transparent opacity-30"></div>
-        <div className="absolute bottom-1/3 right-16 w-1 h-24 bg-gradient-to-b from-purple-400 to-transparent opacity-30"></div>
-        
-        {/* 网格背景 */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="w-full h-full" style={{
-            backgroundImage: 'radial-gradient(circle at 1px 1px, #3b82f6 1px, transparent 0)',
-            backgroundSize: '40px 40px'
-          }}></div>
-        </div>
-      </div>
-
-      {/* 欢迎区域 */}
-      <div className="relative text-center py-12">
-        <h1 className="text-4xl font-bold text-gray-800 mb-4">欢迎您登录系统！</h1>
-        <p className="text-xl text-gray-600 mb-8">{appConfig.app.description}</p>
-        
-        {/* 系统信息 */}
-        <div className="mt-16 text-gray-500">
-          <p className="text-sm">{appConfig.app.name} v{appConfig.app.version} | {appConfig.app.slogan}</p>
-        </div>
-      </div>
-
-      {/* 版权信息 */}
-      <div className="absolute bottom-4 left-0 right-0 text-center">
-        <p className="text-gray-400 text-sm select-none">© {appConfig.company.copyrightYear} {appConfig.company.name} 版权所有</p>
-      </div>
-    </>
+    <div className="p-6">
+      <Row gutter={[24, 24]}>
+        <Col xs={24} lg={16}>
+          {/* 任务列表区域 */}
+          <Task displayMode="pendingOnly" />
+        </Col>
+        <Col xs={24} lg={8}>
+          {/* 通知和提醒区域 */}
+          <Card title="通知和提醒" className="shadow-sm h-full">
+            <div 
+              className="markdown-content" 
+              dangerouslySetInnerHTML={{ __html: markdownContent }} 
+              style={{ whiteSpace: 'pre-wrap' }} // Preserve line breaks
+            />
+          </Card>
+        </Col>
+      </Row>
+    </div>
   );
 }

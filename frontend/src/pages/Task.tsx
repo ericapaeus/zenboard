@@ -45,7 +45,11 @@ interface Task {
   createdAt: string;
 }
 
-const Task: React.FC = () => {
+interface TaskProps {
+  displayMode?: 'full' | 'pendingOnly';
+}
+
+const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   // 添加样式
   React.useEffect(() => {
     const style = document.createElement('style');
@@ -175,7 +179,7 @@ const Task: React.FC = () => {
   }, []);
 
   // 状态管理
-  const [activeTab, setActiveTab] = useState('draft');
+  const [activeTab, setActiveTab] = useState(displayMode === 'pendingOnly' ? 'pending' : 'draft');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchForm] = Form.useForm();
@@ -590,6 +594,9 @@ const Task: React.FC = () => {
 
   // 过滤和分页逻辑
   const getCurrentTabTasks = () => {
+    if (displayMode === 'pendingOnly') {
+      return getTasksByStatus('pending');
+    }
     const statusMap: Record<string, Task['status']> = {
       'draft': 'draft',
       'pending': 'pending', 
@@ -728,7 +735,7 @@ const Task: React.FC = () => {
             padding: '20px'
           }}
           actions={[
-            ...(task.status === 'pending' ? [
+            ...(displayMode === 'full' && task.status === 'pending' ? [
               <Button
                 type="link"
                 icon={<SendOutlined />}
@@ -737,7 +744,7 @@ const Task: React.FC = () => {
                 处理任务
               </Button>
             ] : []),
-            ...(task.status === 'draft' ? [
+            ...(displayMode === 'full' && task.status === 'draft' ? [
               <Button
                 type="link"
                 icon={<SendOutlined />}
@@ -751,6 +758,15 @@ const Task: React.FC = () => {
                 onClick={() => handleEditModalOpen(task)}
               >
                 编辑
+              </Button>
+            ] : []),
+            ...(displayMode === 'pendingOnly' && task.status === 'pending' ? [
+              <Button
+                type="link"
+                icon={<SendOutlined />}
+                onClick={() => handleTransferModalOpen(task)}
+              >
+                处理任务
               </Button>
             ] : [])
           ]}
@@ -983,111 +999,96 @@ const Task: React.FC = () => {
 
   return (
     <div className="p-6">
-      {/* 搜索区域 */}
-      <Card className="mb-6 shadow-sm">
-        <Form
-          form={searchForm}
-          layout="inline"
-          onFinish={handleSearch}
-          className="w-full"
-        >
-          <Row gutter={[16, 16]} className="w-full">
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Form.Item name="keyword" className="w-full mb-0">
-                <Input
-                  placeholder="搜索任务标题、内容、处理人或项目"
-                  prefix={<SearchOutlined className="text-gray-400" />}
-                  allowClear
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Form.Item name="member" className="w-full mb-0">
-                <Select placeholder="选择处理人" allowClear>
-                  <Option value="all">全部成员</Option>
-                  {mockUsers.map(user => (
-                    <Option key={user} value={user}>{user}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={24} md={8} lg={12}>
-              <Space>
-                <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
-                  搜索
-                </Button>
-                <Button onClick={handleReset} icon={<SearchOutlined />}>
-                  重置
-                </Button>
-                <Button 
-                  type="dashed"
-                  icon={expandedTasks.size === currentTabTasks.length ? <DownOutlined /> : <RightOutlined />}
-                  onClick={() => {
-                    if (expandedTasks.size === currentTabTasks.length) {
-                      // 全部收起
-                      setExpandedTasks(new Set());
-                    } else {
-                      // 全部展开
-                      setExpandedTasks(new Set(currentTabTasks.map(task => task.id)));
-                    }
-                  }}
-                  title={expandedTasks.size === currentTabTasks.length ? '全部收起' : '全部展开'}
-                >
-                  {expandedTasks.size === currentTabTasks.length ? '全部收起' : '全部展开'}
-                </Button>
-                <Text type="secondary" className="text-xs">
-                  ({expandedTasks.size}/{currentTabTasks.length} 已展开)
-                </Text>
-                <Button 
-                  type="primary" 
-                  icon={<PlusOutlined />} 
-                  onClick={handleCreateModalOpen}
-                  style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
-                >
-                  添加
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </Form>
-      </Card>
+      {displayMode === 'full' && (
+        <>
+          {/* 搜索区域 */}
+          <Card className="mb-6 shadow-sm">
+            <Form
+              form={searchForm}
+              layout="inline"
+              onFinish={handleSearch}
+              className="w-full"
+            >
+              <Row gutter={[16, 16]} className="w-full">
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <Form.Item name="keyword" className="w-full mb-0">
+                    <Input
+                      placeholder="搜索任务标题、内容、处理人或项目"
+                      prefix={<SearchOutlined className="text-gray-400" />}
+                      allowClear
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <Form.Item name="member" className="w-full mb-0">
+                    <Select placeholder="选择处理人" allowClear>
+                      <Option value="all">全部成员</Option>
+                      {mockUsers.map(user => (
+                        <Option key={user} value={user}>{user}</Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={24} md={8} lg={12}>
+                  <Space>
+                    <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
+                      搜索
+                    </Button>
+                    <Button onClick={handleReset} icon={<SearchOutlined />}>
+                      重置
+                    </Button>
+                    <Button 
+                      type="primary" 
+                      icon={<PlusOutlined />} 
+                      onClick={handleCreateModalOpen}
+                      style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                    >
+                      添加
+                    </Button>
+                  </Space>
+                </Col>
+              </Row>
+            </Form>
+          </Card>
 
-      {/* 标签页 */}
-      <Card className="mb-6 shadow-sm">
-        <Tabs 
-          activeKey={activeTab} 
-          onChange={setActiveTab}
-          items={[
-            {
-              key: 'draft',
-              label: (
-                <span>
-                  <EditFilled />
-                  起草任务 ({getTasksByStatus('draft').length})
-                </span>
-              ),
-            },
-            {
-              key: 'pending',
-              label: (
-                <span>
-                  <ClockCircleFilled />
-                  待办任务 ({getTasksByStatus('pending').length})
-                </span>
-              ),
-            },
-            {
-              key: 'completed',
-              label: (
-                <span>
-                  <CheckCircleFilled />
-                  已办任务 ({getTasksByStatus('completed').length})
-                </span>
-              ),
-            },
-          ]}
-        />
-      </Card>
+          {/* 标签页 */}
+          <Card className="mb-6 shadow-sm">
+            <Tabs 
+              activeKey={activeTab} 
+              onChange={setActiveTab}
+              items={[
+                {
+                  key: 'draft',
+                  label: (
+                    <span>
+                      <EditFilled />
+                      起草任务 ({getTasksByStatus('draft').length})
+                    </span>
+                  ),
+                },
+                {
+                  key: 'pending',
+                  label: (
+                    <span>
+                      <ClockCircleFilled />
+                      待办任务 ({getTasksByStatus('pending').length})
+                    </span>
+                  ),
+                },
+                {
+                  key: 'completed',
+                  label: (
+                    <span>
+                      <CheckCircleFilled />
+                      已办任务 ({getTasksByStatus('completed').length})
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </Card>
+        </>
+      )}
 
       {/* 任务列表 */}
       {renderExpandableTaskList()}
@@ -1118,10 +1119,10 @@ const Task: React.FC = () => {
       {currentTabTasks.length === 0 && (
         <div className="text-center py-12">
           <div className="text-gray-400 text-lg mb-2">
-            {searchForm.getFieldValue('keyword') || searchForm.getFieldValue('member') ? '没有找到匹配的任务' : `暂无${activeTab === 'draft' ? '起草' : activeTab === 'pending' ? '待办' : '已办'}任务`}
+            {displayMode === 'pendingOnly' ? '暂无待办任务' : (searchForm.getFieldValue('keyword') || searchForm.getFieldValue('member') ? '没有找到匹配的任务' : `暂无${activeTab === 'draft' ? '起草' : activeTab === 'pending' ? '待办' : '已办'}任务`)}
           </div>
           <div className="text-gray-400 text-sm">
-            {searchForm.getFieldValue('keyword') || searchForm.getFieldValue('member') ? '请尝试调整搜索关键词' : '点击右上角按钮添加'}
+            {displayMode === 'pendingOnly' ? '请稍后再试或联系管理员' : (searchForm.getFieldValue('keyword') || searchForm.getFieldValue('member') ? '请尝试调整搜索关键词' : '点击右上角按钮添加')}
           </div>
         </div>
       )}
