@@ -1,6 +1,6 @@
 import Sidebar from "./Sidebar";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Breadcrumb, Tabs, Avatar, Dropdown, Space, ConfigProvider, theme } from "antd";
+import { Breadcrumb, Avatar, Dropdown, Space, ConfigProvider, theme, Button, Tooltip } from "antd";
 import { UserOutlined, SettingOutlined, LogoutOutlined, TranslationOutlined, FullscreenOutlined, FullscreenExitOutlined, MenuUnfoldOutlined, MenuFoldOutlined } from "@ant-design/icons";
 import { useState, useCallback, useEffect } from "react";
 import { DesktopOutlined, SunOutlined, MoonOutlined } from '@ant-design/icons';
@@ -9,7 +9,7 @@ import { appConfig } from '@/config/app';
 
 // 简化的路由标签映射
 const routeLabels: Record<string, string> = {
-  '/': '首页',
+  '/': '控制台',
   '/users': '用户管理',
   '/users/list': '用户列表',
   '/projects/list': '项目列表',
@@ -21,7 +21,7 @@ const routeLabels: Record<string, string> = {
 
 // 获取面包屑项
 function getBreadcrumbItems(pathname: string) {
-  const items = [{ title: '首页' }];
+  const items = [{ title: '控制台' }];
   
   // 特殊处理各种列表路径，显示完整的三级路径
   if (pathname === '/users/list') {
@@ -56,7 +56,7 @@ function getBreadcrumbItems(pathname: string) {
   
   // 根据路径获取标签
   const label = routeLabels[pathname];
-  if (label && label !== '首页') {
+  if (label && label !== '控制台') {
     items.push({ title: label });
   }
   
@@ -146,11 +146,11 @@ export default function MainLayout() {
   const userRole = userInfo?.role || '管理员';
   const userAvatar = userInfo?.avatar; // 获取用户头像
   
-  // 动态标签页
-  const [tabs, setTabs] = useState<{ key: string; label: React.ReactNode; closable: boolean }[]>([
-    { key: "/", label: getTabLabelByPath('/'), closable: false }
-  ]);
-  const [activeTab, setActiveTab] = useState("/");
+  // 动态标签页（临时禁用）
+  // const [tabs, setTabs] = useState<{ key: string; label: React.ReactNode; closable: boolean }[]>([
+  //   { key: "/", label: getTabLabelByPath('/'), closable: false }
+  // ]);
+  // const [activeTab, setActiveTab] = useState("/");
 
   // 全屏功能
   const toggleFullscreen = () => {
@@ -181,55 +181,45 @@ export default function MainLayout() {
     };
   }, []);
 
-  // 侧边栏菜单点击，动态添加标签页
+  // 侧边栏菜单点击，仅导航（标签页已禁用）
   const handleMenuClick = useCallback((key: string) => {
-    setTabs((prevTabs) => {
-      if (prevTabs.find((tab) => tab.key === key)) return prevTabs;
-      return [
-        ...prevTabs,
-        { key, label: getTabLabelByPath(key), closable: key !== "/" }
-      ];
-    });
-    setActiveTab(key);
     navigate(key);
   }, [navigate]);
 
-  // 路由变化时自动创建标签页
-  useEffect(() => {
-    const currentPath = location.pathname;
-    if (currentPath === '/') return; // 首页不需要创建标签页
-    
-    setTabs((prevTabs) => {
-      if (prevTabs.find((tab) => tab.key === currentPath)) return prevTabs;
-      return [
-        ...prevTabs,
-        { key: currentPath, label: getTabLabelByPath(currentPath), closable: currentPath !== "/" }
-      ];
-    });
-    setActiveTab(currentPath);
-  }, [location.pathname]);
+  // 路由变化时自动创建标签页（已禁用）
+  // useEffect(() => {
+  //   const currentPath = location.pathname;
+  //   if (currentPath === '/') return; // 首页不需要创建标签页
+  //   setTabs((prevTabs) => {
+  //     if (prevTabs.find((tab) => tab.key === currentPath)) return prevTabs;
+  //     return [
+  //       ...prevTabs,
+  //       { key: currentPath, label: getTabLabelByPath(currentPath), closable: currentPath !== "/" }
+  //     ];
+  //   });
+  //   setActiveTab(currentPath);
+  // }, [location.pathname]);
 
-  // 标签页切换
-  const handleTabChange = (key: string) => {
-    setActiveTab(key);
-    navigate(key);
-  };
+  // 标签页切换（已禁用）
+  // const handleTabChange = (key: string) => {
+  //   setActiveTab(key);
+  //   navigate(key);
+  // };
 
-  // 标签页关闭
-  const handleTabEdit = (targetKey: string, action: "remove" | "add") => {
-    if (action === "remove") {
-      setTabs((prevTabs) => {
-        const filtered = prevTabs.filter((tab) => tab.key !== targetKey);
-        // 关闭当前激活页时，切换到最后一个标签
-        if (activeTab === targetKey && filtered.length > 0) {
-          const lastTab = filtered[filtered.length - 1];
-          setActiveTab(lastTab.key);
-          navigate(lastTab.key);
-        }
-        return filtered;
-      });
-    }
-  };
+  // 标签页关闭（已禁用）
+  // const handleTabEdit = (targetKey: string, action: "remove" | "add") => {
+  //   if (action === "remove") {
+  //     setTabs((prevTabs) => {
+  //       const filtered = prevTabs.filter((tab) => tab.key !== targetKey);
+  //       if (activeTab === targetKey && filtered.length > 0) {
+  //         const lastTab = filtered[filtered.length - 1];
+  //         setActiveTab(lastTab.key);
+  //         navigate(lastTab.key);
+  //       }
+  //       return filtered;
+  //     });
+  //   }
+  // };
 
   // 用户下拉菜单
   const userMenuItems = [
@@ -286,6 +276,7 @@ export default function MainLayout() {
       <Sidebar 
         onMenuClick={handleMenuClick} 
         collapsed={sidebarCollapsed}
+        isDark={isDark}
       />
       <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         {/* 顶部导航栏 */}
@@ -293,18 +284,16 @@ export default function MainLayout() {
           <div className="flex items-center justify-between">
             {/* 左侧面包屑和收缩按钮 */}
             <div className="flex items-center">
-              {/* 侧边栏收缩按钮 */}
-              <button
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200 mr-3 focus:outline-none"
-                title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
-              >
-                {sidebarCollapsed ? (
-                  <MenuUnfoldOutlined className="text-gray-600 text-base" />
-                ) : (
-                  <MenuFoldOutlined className="text-gray-600 text-base" />
-                )}
-              </button>
+              {/* 侧边栏收缩按钮（Ant Design） */}
+              <Tooltip title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}>
+                <Button
+                  type="text"
+                  size="large"
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  className="mr-3"
+                />
+              </Tooltip>
               
               {/* 面包屑 */}
               <Breadcrumb 
@@ -317,32 +306,34 @@ export default function MainLayout() {
             <div className="flex items-center space-x-4">
               {/* 操作按钮 */}
               <Space size="small">
-                {/* 主题切换 */}
+                {/* 主题切换（AntD Button 触发 Dropdown） */}
                 <Dropdown menu={{ items: themeMenuItems, onClick: handleThemeChange }} placement="bottomRight">
-                  <button className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200 focus:outline-none" title="主题模式">
-                    {themeMode === 'dark' || (themeMode === 'system' && systemPrefersDark) ? (
-                      <MoonOutlined className="text-gray-600 text-base" />
-                    ) : (
-                      <SunOutlined className="text-gray-600 text-base" />
-                    )}
-                  </button>
+                  <Button
+                    type="text"
+                    shape="circle"
+                    icon={themeMode === 'dark' || (themeMode === 'system' && systemPrefersDark) ? <MoonOutlined /> : <SunOutlined />}
+                    aria-label="主题模式"
+                  />
                 </Dropdown>
+                {/* 语言/其它操作 */}
                 <Dropdown menu={{ items: actionMenuItems, onClick: handleActionMenuClick }} placement="bottomRight">
-                  <button className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200 focus:outline-none">
-                    <TranslationOutlined className="text-gray-600 text-base" />
-                  </button>
+                  <Button
+                    type="text"
+                    shape="circle"
+                    icon={<TranslationOutlined />}
+                    aria-label="操作"
+                  />
                 </Dropdown>
-                <button 
-                  onClick={toggleFullscreen}
-                  className="p-2 hover:bg-gray-50 rounded-lg transition-all duration-200 border border-transparent hover:border-gray-200 focus:outline-none"
-                  title={isFullscreen ? "退出全屏" : "进入全屏"}
-                >
-                  {isFullscreen ? (
-                    <FullscreenExitOutlined className="text-gray-600 text-base" />
-                  ) : (
-                    <FullscreenOutlined className="text-gray-600 text-base" />
-                  )}
-                </button>
+                {/* 全屏 */}
+                <Tooltip title={isFullscreen ? "退出全屏" : "进入全屏"}>
+                  <Button
+                    type="text"
+                    shape="circle"
+                    onClick={toggleFullscreen}
+                    icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+                    aria-label={isFullscreen ? "退出全屏" : "进入全屏"}
+                  />
+                </Tooltip>
               </Space>
               
               {/* 用户头像和下拉菜单 */}
@@ -364,7 +355,8 @@ export default function MainLayout() {
             </div>
           </div>
           
-          {/* 导航标签页 */}
+          {/* 导航标签页（已临时禁用） */}
+          {/**
           <div className="mt-2 border-b border-gray-100">
             <Tabs
               activeKey={activeTab}
@@ -378,10 +370,11 @@ export default function MainLayout() {
               className="custom-tabs"
             />
           </div>
+          */}
         </header>
 
         {/* 主内容区域 */}
-        <main className="flex-1 p-6 pt-[150px]" style={{ backgroundColor: isDark ? '#0b1220' : '#f7f8fa' }}>
+        <main className="flex-1 p-6 pt-[90px]" style={{ backgroundColor: isDark ? '#0b1220' : '#f7f8fa' }}>
           <div className="rounded-lg shadow-sm mx-auto" style={{minHeight: 'calc(100vh - 200px)', backgroundColor: isDark ? '#111827' : '#ffffff' }}>
             <div className="p-8">
               <Outlet />
