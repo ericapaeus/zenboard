@@ -25,7 +25,7 @@ const mockUsers = [
   { id: 'u4', name: '赵六', avatar: '赵' },
 ];
 
-const MyProjects: React.FC = () => {
+const Projects: React.FC = () => {
   const navigate = useNavigate();
   const [isCreateModalVisible, setIsCreateModalVisible] = React.useState(false);
   const [createForm] = Form.useForm();
@@ -400,4 +400,4 @@ const MyProjects: React.FC = () => {
   );
 };
 
-export default MyProjects;
+export default Projects;

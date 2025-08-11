@@ -45,7 +45,7 @@ interface Task {
   createdAt: string;
 }
 
-const MyTasks: React.FC = () => {
+const Task: React.FC = () => {
   // 添加样式
   React.useEffect(() => {
     const style = document.createElement('style');
@@ -1768,4 +1768,4 @@ const MyTasks: React.FC = () => {
   );
 };
 
-export default MyTasks;
+export default Task;
