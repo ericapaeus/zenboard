@@ -1,5 +1,5 @@
 import React, { lazy } from 'react';
-import { UserOutlined, TeamOutlined, FileTextOutlined, SettingOutlined, UserSwitchOutlined, ProjectOutlined, CheckSquareOutlined, BookOutlined } from '@ant-design/icons';
+import { UserOutlined, TeamOutlined, FileTextOutlined, SettingOutlined, UserSwitchOutlined, ProjectOutlined, CheckSquareOutlined, BookOutlined, HomeOutlined } from '@ant-design/icons';
 
 // 懒加载页面组件
 const Dashboard = lazy(() => import('../pages/Dashboard'));
@@ -25,8 +25,8 @@ export interface RouteConfig {
 export const routes: RouteConfig[] = [
   {
     path: '/',
-    label: '首页',
-    icon: React.createElement(UserOutlined),
+    label: '控制台',
+    icon: React.createElement(HomeOutlined),
     meta: { component: Dashboard },
   },
   {
