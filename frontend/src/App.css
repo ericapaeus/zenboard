@@ -395,3 +395,105 @@ button:focus-visible {
 *:focus-visible {
   outline: none;
 }
+
+/* 让收缩状态下的侧边栏菜单图标居中显示 */
+.ant-menu-inline-collapsed .ant-menu-item,
+.ant-menu-inline-collapsed .ant-menu-submenu-inline {
+  display: flex !important;
+  justify-content: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+.ant-menu-inline-collapsed .ant-menu-item .anticon,
+.ant-menu-inline-collapsed .ant-menu-submenu-title .anticon {
+  margin: 0 !important;
+  font-size: 16px;
+}
+
+/* 让所有 collapsed 菜单项的内容都居中，包括图标和选中高亮 */
+.ant-menu-inline-collapsed .ant-menu-item,
+.ant-menu-inline-collapsed .ant-menu-submenu {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  border-radius: 8px !important;
+  transition: background 0.2s;
+}
+
+.ant-menu-inline-collapsed .ant-menu-item .anticon,
+.ant-menu-inline-collapsed .ant-menu-submenu-title .anticon {
+  margin: 0 !important;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 收缩时菜单项悬浮/选中美化 */
+.ant-menu-inline-collapsed .ant-menu-item:hover,
+.ant-menu-inline-collapsed .ant-menu-item-active,
+.ant-menu-inline-collapsed .ant-menu-item-selected {
+  background: #f0f5ff !important;
+  color: #165dff !important;
+  border-radius: 8px !important;
+}
+
+/* 收缩时隐藏菜单文字内容，只显示图标 */
+.ant-menu-inline-collapsed .ant-menu-item .ant-menu-title-content,
+.ant-menu-inline-collapsed .ant-menu-submenu .ant-menu-title-content {
+  display: none !important;
+  width: 0 !important;
+  padding: 0 !important;
+}
+
+/* 可选：收缩时隐藏子菜单箭头 */
+.ant-menu-inline-collapsed .ant-menu-submenu-arrow {
+  display: none !important;
+}
+
+/* 收缩时确保子菜单标题本身完全居中，移除默认左右内边距 */
+.ant-menu-inline-collapsed .ant-menu-submenu .ant-menu-submenu-title {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-inline: 0 !important;
+  text-align: center !important;
+  gap: 0 !important;
+}
+
+/* 缩小侧边栏收缩时菜单 Tooltip 的宽度和字号 */
+.ant-tooltip {
+  max-width: 120px !important;
+  font-size: 13px !important;
+  padding: 0 !important;
+}
+
+.ant-tooltip-inner {
+  min-width: 0 !important;
+  max-width: 120px !important;
+  padding: 4px 10px !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
+  text-align: center;
+}
+
+/* 统一 Tooltip 内容居中（适用于收缩菜单的悬浮框） */
+.ant-tooltip .ant-tooltip-inner {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+.ant-tooltip .ant-tooltip-inner .ant-tooltip-inner-content {
+  width: 100% !important;
+  text-align: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap;
+}

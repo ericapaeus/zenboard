@@ -108,7 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuClick, collapsed = false, isDar
 
   return (
     <aside
-      className={`fixed h-full z-30 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}
+      className={`fixed h-full z-30 transition-all duration-300 ${collapsed ? 'w-20' : 'w-64'}`}
       style={{ backgroundColor: sidebarBg, color: sidebarText, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
     >
       <div className="p-4 flex items-center gap-3" style={{ borderBottom: `1px solid ${borderColor}` }}>
@@ -127,7 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuClick, collapsed = false, isDar
         )}
       </div>
       
-      <nav className="p-4">
+      <nav className={collapsed ? 'py-4 px-0' : 'p-4'}>
         <Menu
           mode="inline"
           theme={isDark ? 'dark' : 'light'}

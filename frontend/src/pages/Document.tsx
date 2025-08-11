@@ -96,7 +96,8 @@ const DocumentPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
-  const [diaryType, setDiaryType] = useState<'public' | 'project' | 'assigned' | 'private'>('public');
+  // 删除 diaryType 相关 useState
+  // const [diaryType, setDiaryType] = useState<'public' | 'project' | 'assigned' | 'private'>('public');
   const [drafts, setDrafts] = useState<DiaryEntry[]>([]);
   const [editingDraftId, setEditingDraftId] = useState<number | null>(null);
   const [editingForDiaries, setEditingForDiaries] = useState<boolean>(false);
@@ -116,8 +117,9 @@ const DocumentPage: React.FC = () => {
 
   // 使用 hooks
   const searchFormValues = searchForm.getFieldsValue();
-  const type = searchFormValues?.type as DiaryEntry['type'] | undefined;
-  const visibility = type ? mapTypeToVisibility(type) : undefined;
+  // 删除 type 字段相关逻辑
+  // const type = searchFormValues?.type as DiaryEntry['type'] | undefined;
+  // const visibility = type ? mapTypeToVisibility(type) : undefined;
   
   const { 
     data: documentsData, 
@@ -127,7 +129,8 @@ const DocumentPage: React.FC = () => {
   } = useDocuments({
     skip: (currentPage - 1) * pageSize,
     limit: pageSize,
-    visibility,
+    // 删除 visibility 筛选条件
+    // visibility,
     order_by: '-id'
   });
 
@@ -212,9 +215,10 @@ const DocumentPage: React.FC = () => {
       const kw = String(values.keyword).toLowerCase();
       result = result.filter((d) => (d.title || '').toLowerCase().includes(kw));
     }
-    if (values?.type && values.type !== 'all') {
-      result = result.filter((d) => d.type === values.type);
-    }
+    // 删除 type 筛选条件
+    // if (values?.type && values.type !== 'all') {
+    //   result = result.filter((d) => d.type === values.type);
+    // }
     if (values?.member && values.member !== 'all') {
       result = result.filter((d) => (d.members || []).includes(values.member));
     }
@@ -241,8 +245,8 @@ const DocumentPage: React.FC = () => {
 
   const handleSearch = useCallback((values: any) => {
     // 获取可见性筛选条件
-    const type = values?.type as DiaryEntry['type'] | undefined;
-    const visibility = type ? mapTypeToVisibility(type) : undefined;
+    // const type = values?.type as DiaryEntry['type'] | undefined;
+    // const visibility = type ? mapTypeToVisibility(type) : undefined;
     
     // 更新分页参数，触发重新加载
     setCurrentPage(1);
@@ -268,7 +272,8 @@ const DocumentPage: React.FC = () => {
   const showModal = useCallback(() => {
     setIsModalOpen(true);
     form.resetFields();
-    setDiaryType('public');
+    // 删除 showModal/setDiaryType 相关
+    // setDiaryType('public');
     setEditingDraftId(null);
     setEditingForDiaries(false);
     // default values
@@ -286,7 +291,8 @@ const DocumentPage: React.FC = () => {
         const newDraft: DiaryEntry = {
           id: Date.now(),
           date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-          type: diaryType,
+          // 删除 diaryType 相关
+          // type: diaryType,
           title: values.title,
           content: values.content,
           members: values.members,
@@ -305,7 +311,7 @@ const DocumentPage: React.FC = () => {
       .catch(() => {
         message.error('请填写完整内容');
       });
-  }, [form, diaryType, editingDraftId, drafts]);
+  }, [form, editingDraftId, drafts]);
 
   const handleSubmit = useCallback(async () => {
     try {
@@ -317,7 +323,8 @@ const DocumentPage: React.FC = () => {
           await updateDocument(editingDraftId, {
             title: values.title,
             content: values.content,
-            visibility: mapTypeToVisibility(diaryType),
+            // 删除 diaryType 相关
+            // visibility: mapTypeToVisibility(diaryType),
           });
           setIsModalOpen(false);
           setEditingDraftId(null);
@@ -330,7 +337,8 @@ const DocumentPage: React.FC = () => {
               d.id === editingDraftId
                 ? {
                     ...d,
-                    type: diaryType,
+                    // 删除 diaryType 相关
+                    // type: diaryType,
                     title: values.title,
                     content: values.content,
                     members: values.members,
@@ -347,7 +355,8 @@ const DocumentPage: React.FC = () => {
         await createDocument({
           title: values.title || '无标题',
           content: values.content,
-          visibility: mapTypeToVisibility(diaryType),
+          // 删除 diaryType 相关
+          // visibility: mapTypeToVisibility(diaryType),
         });
         setIsModalOpen(false);
         // 重新获取文档列表，确保显示最新数据
@@ -362,13 +371,14 @@ const DocumentPage: React.FC = () => {
         message.error('请填写完整内容');
       }
     }
-  }, [form, editingDraftId, editingForDiaries, diaryType, updateDocument, createDocument, refetchDocuments, loadDocuments, pageSize]);
+  }, [form, editingDraftId, editingForDiaries, updateDocument, createDocument, refetchDocuments, loadDocuments, pageSize]);
 
   const handleEditDraft = useCallback((draft: DiaryEntry) => {
     setIsModalOpen(true);
     setEditingDraftId(draft.id);
     setEditingForDiaries(false);
-    setDiaryType(draft.type);
+    // 删除 handleEditDraft/setDiaryType 相关
+    // setDiaryType(draft.type);
     form.setFieldsValue({
       type: draft.type,
       title: draft.title,
@@ -381,7 +391,8 @@ const DocumentPage: React.FC = () => {
     setIsModalOpen(true);
     setEditingDraftId(item.id);
     setEditingForDiaries(true);
-    setDiaryType(item.type);
+    // 删除 handleEditDiary/setDiaryType 相关
+    // setDiaryType(item.type);
     form.setFieldsValue({ type: item.type, title: item.title, content: item.content, members: item.members });
   }, [form]);
 
@@ -513,6 +524,16 @@ const DocumentPage: React.FC = () => {
     return Array.from(setIds).map((m) => ({ label: m, value: m }));
   }, [diaries]);
 
+  // 在组件顶部 useMemo 处添加 mock 选项
+  const projectOptions = [
+    { label: '项目A', value: 'projectA' },
+    { label: '项目B', value: 'projectB' },
+  ];
+  const userOptions = [
+    { label: '用户1', value: 'user1' },
+    { label: '用户2', value: 'user2' },
+  ];
+
   return (
     <div style={{ padding: 24 }}>
       {/* 搜索区域（包含时间范围） */}
@@ -544,7 +565,8 @@ const DocumentPage: React.FC = () => {
                 />
               </Form.Item>
             </Col>
-            <Col flex="none">
+            {/* 删除弹窗表单左侧的类型选择 Form.Item */}
+            {/* <Col flex="none">
               <Form.Item name="type" style={{ marginBottom: 0 }}>
                 <Select
                   placeholder="选择可见性"
@@ -559,7 +581,7 @@ const DocumentPage: React.FC = () => {
                   ]}
                 />
               </Form.Item>
-            </Col>
+            </Col> */}
             {memberOptions.length > 0 && (
               <Col flex="none">
                 <Form.Item name="member" style={{ marginBottom: 0 }}>
@@ -735,7 +757,7 @@ const DocumentPage: React.FC = () => {
         open={isModalOpen} 
         onCancel={handleCancel} 
         footer={null} 
-        width={900}
+        width={600}
         confirmLoading={createLoading || updateLoading}
       >
         <Form
@@ -743,70 +765,46 @@ const DocumentPage: React.FC = () => {
           layout="vertical"
           initialValues={{ type: 'public', content: '', title: '' }}
         >
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item label="选择类型" name="type">
-                <Radio.Group
-                  onChange={(e) => setDiaryType(e.target.value)}
-                  value={diaryType}
-                >
-                  <Space direction="vertical">
-                    <Radio value="public">公开文档</Radio>
-                    <Radio value="project">项目文档</Radio>
-                    <Radio value="assigned">指定文档</Radio>
-                    <Radio value="private">私人文档</Radio>
-                  </Space>
-                </Radio.Group>
-              </Form.Item>
-              {diaryType === 'assigned' && (
-                <Form.Item label="选择成员" name="members">
-                  <Select
-                    mode="multiple"
-                    placeholder="请选择成员"
-                    options={[
-                      { label: '成员A', value: 'member1' },
-                      { label: '成员B', value: 'member2' },
-                      { label: '成员C', value: 'member3' },
-                    ]}
-                  />
-                </Form.Item>
-              )}
-            </Col>
-            <Col span={16}>
-              <Form.Item label="标题" name="title">
-                <Input placeholder="请输入标题（可选）" />
-              </Form.Item>
-              <Form.Item
-                label="内容"
-                name="content"
-                rules={[{ required: true, message: '请输入内容！' }]}
-              >
-                <TextArea rows={10} placeholder="支持 Markdown 语法" />
-              </Form.Item>
-              <Card size="small" title="预览">
-                <div
-                  style={{
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 4,
-                    padding: 12,
-                    backgroundColor: '#fafafa',
-                    minHeight: 120,
-                  }}
-                >
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {normalizeMarkdown(contentPreview || '')}
-                  </ReactMarkdown>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-
-          <Form.Item style={{ marginTop: 16 }}>
-            <Space>
-              <Button type="primary" onClick={handleSubmit} loading={createLoading || updateLoading}>
-                提交
-              </Button>
-            </Space>
+          <Form.Item label="所属项目" name="project" style={{ marginBottom: 16 }}>
+            <Select placeholder="请选择项目" options={projectOptions} />
+          </Form.Item>
+          <Form.Item label="指定用户" name="users" style={{ marginBottom: 16 }}>
+            <Select
+              mode="multiple"
+              placeholder="请选择用户"
+              options={userOptions}
+            />
+          </Form.Item>
+          <Form.Item label="标题" name="title" style={{ marginBottom: 16 }}>
+            <Input placeholder="请输入标题（可选）" />
+          </Form.Item>
+          <Form.Item
+            label="内容"
+            name="content"
+            rules={[{ required: true, message: '请输入内容！' }]}
+            style={{ marginBottom: 16 }}
+          >
+            <TextArea rows={10} placeholder="支持 Markdown 语法" />
+          </Form.Item>
+          <Card size="small" title="预览" style={{ marginBottom: 16 }}>
+            <div
+              style={{
+                border: '1px solid #f0f0f0',
+                borderRadius: 4,
+                padding: 12,
+                backgroundColor: '#fafafa',
+                minHeight: 120,
+              }}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {normalizeMarkdown(contentPreview || '')}
+              </ReactMarkdown>
+            </div>
+          </Card>
+          <Form.Item style={{ textAlign: 'right', marginTop: 24 }}>
+            <Button type="primary" onClick={handleSubmit} loading={createLoading || updateLoading}>
+              提交
+            </Button>
           </Form.Item>
         </Form>
       </Modal>

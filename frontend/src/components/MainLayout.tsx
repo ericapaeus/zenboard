@@ -278,9 +278,9 @@ export default function MainLayout() {
         collapsed={sidebarCollapsed}
         isDark={isDark}
       />
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
         {/* 顶部导航栏 */}
-        <header className="fixed top-0 right-0 z-20 shadow-sm border-b px-6 py-3 transition-all duration-300" style={{ left: sidebarCollapsed ? '64px' : '256px', backgroundColor: isDark ? '#111827' : '#ffffff', borderColor: isDark ? '#1f2937' : '#f0f0f0' }}>
+        <header className="fixed top-0 right-0 z-20 shadow-sm border-b px-6 py-3 transition-all duration-300" style={{ left: sidebarCollapsed ? '80px' : '256px', backgroundColor: isDark ? '#111827' : '#ffffff', borderColor: isDark ? '#1f2937' : '#f0f0f0' }}>
           <div className="flex items-center justify-between">
             {/* 左侧面包屑和收缩按钮 */}
             <div className="flex items-center">
@@ -374,7 +374,7 @@ export default function MainLayout() {
         </header>
 
         {/* 主内容区域 */}
-        <main className="flex-1 p-6 pt-[90px]" style={{ backgroundColor: isDark ? '#0b1220' : '#f7f8fa' }}>
+        <main className="flex-1 p-6 pt-[90px]" style={{ backgroundColor: isDark ? '#0b1220' : '#f7f8fa', paddingLeft: '1.1rem', paddingRight: '1.1rem' }}>
           <div className="rounded-lg shadow-sm mx-auto" style={{minHeight: 'calc(100vh - 200px)', backgroundColor: isDark ? '#111827' : '#ffffff' }}>
             <div className="p-8">
               <Outlet />
