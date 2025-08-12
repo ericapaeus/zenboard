@@ -140,9 +140,11 @@ export interface UploadResponse {
 }
 
 // 消息中心相关类型（用于创建消息与返回值）
+export type MessageLevel = 'info' | 'warning' | 'error';
+
 export interface MessageCreateData {
   type: string;
-  level?: 'info' | 'warning' | 'error';
+  level?: MessageLevel;
   title: string;
   content?: string;
   entity_type?: 'contract' | 'document' | 'task' | 'project';
@@ -155,7 +157,7 @@ export interface MessageCreateData {
 export interface MessageResponse {
   id: number;
   type: string;
-  level: 'info' | 'warning' | 'error';
+  level: MessageLevel;
   title: string;
   content?: string;
   entity_type?: 'contract' | 'document' | 'task' | 'project';
@@ -163,6 +165,24 @@ export interface MessageResponse {
   actor_id?: number;
   data_json?: string;
   created_at: string;
+}
+
+// 我的通知（后端 /api/message/my 返回项）
+export interface UserNotification {
+  id: number; // recipient_id
+  type: string;
+  level: MessageLevel;
+  title: string;
+  content?: string;
+  entity_type?: 'contract' | 'document' | 'task' | 'project';
+  entity_id?: number;
+  actor_id?: number;
+  actor_name?: string | null;
+  data_json?: string | null;
+  created_at: string; // message.created_at
+  read: boolean;
+  read_at?: string | null;
+  delivered_at: string;
 }
 
 // 通用状态管理类型
