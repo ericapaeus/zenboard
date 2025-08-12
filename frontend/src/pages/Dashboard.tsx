@@ -1,10 +1,19 @@
 import React from 'react';
-import { Row, Col, Card, Typography, List, Space, Badge, Avatar, Button, Modal, Form, Input, Select } from 'antd';
+import { Row, Col, Card, Typography, List, Space, Badge, Avatar, Button, Modal, Form, Input, Select, Tag, Skeleton } from 'antd';
 import { CheckCircleTwoTone, NotificationTwoTone, FileTextOutlined, SearchOutlined, PlusOutlined } from '@ant-design/icons';
 import Task from '@/pages/Task';
+import { messageApi } from '@/services/api';
+import type { UserNotification } from '@/types';
 import { createPortal } from 'react-dom';
 
 const { Text } = Typography;
+
+// 将时间 +8 小时后格式化展示（适配服务器 UTC 时间）
+const formatPlus8 = (timeStr: string) => {
+  const d = new Date(timeStr);
+  if (isNaN(d.getTime())) return timeStr;
+  return new Date(d.getTime() + 8 * 60 * 60 * 1000).toLocaleString('zh-CN');
+};
 
 interface MessageItem {
   id: number;
@@ -51,38 +60,66 @@ export default function Dashboard() {
     }
   };
 
-  // 静态消息数据
-  const messages: MessageItem[] = [
-    { id: 201, type: 'task', title: '任务 #532 指派给你：修复二维码过期提示', content: '优先级：中，截止 08-14', time: '2025-08-13 09:20', unread: true },
-    { id: 202, type: 'document', title: '新文档：项目立项说明', content: '由 王小明 创建', time: '2025-08-12 18:05', unread: true },
-    { id: 203, type: 'announcement', title: '今晚 22:00-23:00 系统维护', content: '请提前保存你的工作', time: '2025-08-12 10:10' },
-    { id: 204, type: 'task', title: '任务 #528 状态更新为已完成', content: '由 李雷 完成', time: '2025-08-11 16:21' },
-    { id: 205, type: 'document', title: '文档已更新：接口对接说明', content: '由 韩梅梅 更新', time: '2025-08-11 14:02' },
-  ];
+  // 消息中心数据
+  const [loadingMessages, setLoadingMessages] = React.useState(true);
+  const [messages, setMessages] = React.useState<UserNotification[]>([]);
+  const [unreadCount, setUnreadCount] = React.useState<number>(0);
 
-  const renderMessageItem = (m: MessageItem) => {
-    const icon = m.type === 'task' ? <CheckCircleTwoTone twoToneColor="#52c41a" />
-      : m.type === 'document' ? <FileTextOutlined style={{ color: '#1677ff' }} />
+  const fetchMessages = React.useCallback(async () => {
+    setLoadingMessages(true);
+    try {
+      const [listRes, countRes] = await Promise.all([
+        messageApi.listMy({ skip: 0, limit: 10 }),
+        messageApi.unreadCount(),
+      ]);
+      if (listRes.success) setMessages(listRes.data || []);
+      if (countRes.success) setUnreadCount(countRes.data || 0);
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, []);
+
+  React.useEffect(() => { fetchMessages(); }, [fetchMessages]);
+
+  const renderMessageItem = (m: UserNotification) => {
+    const typeIcon = m.entity_type === 'task' ? <CheckCircleTwoTone twoToneColor="#52c41a" />
+      : m.entity_type === 'document' ? <FileTextOutlined style={{ color: '#1677ff' }} />
       : <NotificationTwoTone twoToneColor="#faad14" />;
 
+    const levelColor: Record<string, string> = { info: 'blue', warning: 'orange', error: 'red' };
+
     return (
-      <List.Item>
+      <List.Item onClick={() => markOneAsRead(m)} style={{ cursor: 'pointer' }}>
         <List.Item.Meta
           avatar={
-            <Badge dot={!!m.unread}>
-              <Avatar style={{ background: '#f0f5ff' }} icon={icon} />
+            <Badge dot={!m.read}>
+              <Avatar style={{ background: '#f0f5ff' }} icon={typeIcon} />
             </Badge>
           }
-          title={<Text strong>{m.title}</Text>}
+          title={<Space><Text strong>{m.title}</Text><Tag color={levelColor[m.level] || 'blue'}>{m.level}</Tag></Space>}
           description={
             <Space direction="vertical" size={2}>
               {m.content && <Text type="secondary">{m.content}</Text>}
-              <Text type="secondary" style={{ fontSize: 12 }}>{m.time}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {m.actor_name ? <>由 {m.actor_name} <span style={{ margin: '0 4px' }}>•</span></> : null}
+                {formatPlus8(m.delivered_at || m.created_at)}
+              </Text>
             </Space>
           }
         />
       </List.Item>
     );
+  };
+
+  const markOneAsRead = async (m: UserNotification) => {
+    if (m.read) return;
+    const res = await messageApi.markRead(m.id);
+    if (res.success) fetchMessages();
+  };
+
+  const markAllAsRead = async () => {
+    const res = await messageApi.markAllRead();
+    if (res.success) fetchMessages();
   };
 
   return (
@@ -107,13 +144,17 @@ export default function Dashboard() {
           </div>
         </Col>
         <Col xs={24} lg={8}>
-          <Card title="消息中心" className="shadow-sm h-full" bodyStyle={{ paddingTop: 12 }}>
-            <List
-              itemLayout="horizontal"
-              dataSource={messages}
-              renderItem={renderMessageItem}
-              locale={{ emptyText: '暂无消息' }}
-            />
+          <Card title={<Space>消息中心{unreadCount>0 && <Tag color="red">未读 {unreadCount}</Tag>}</Space>} extra={<Button size="small" onClick={markAllAsRead}>全部已读</Button>} className="shadow-sm h-full" bodyStyle={{ paddingTop: 12 }}>
+            {loadingMessages ? (
+              <Skeleton active paragraph={{ rows: 4 }} />
+            ) : (
+              <List
+                itemLayout="horizontal"
+                dataSource={messages}
+                renderItem={renderMessageItem}
+                locale={{ emptyText: '暂无消息' }}
+              />
+            )}
           </Card>
         </Col>
       </Row>

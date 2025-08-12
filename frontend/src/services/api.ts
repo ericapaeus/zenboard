@@ -393,7 +393,7 @@ export const documentCommentApi = {
 
 // 消息中心 API
 export const messageApi = {
-  // 获取消息列表
+  // 旧：通用消息列表（保留以兼容其他页面）
   getMessages: (params?: {
     page?: number;
     limit?: number;
@@ -415,22 +415,35 @@ export const messageApi = {
     return api.get(`/api/message${query ? `?${query}` : ''}`);
   },
 
+  // 新：我的通知列表（对接后端 /api/message/my）
+  listMy: (params?: { read?: boolean; skip?: number; limit?: number; }): Promise<ApiResponse<import('@/types').UserNotification[]>> => {
+    const sp = new URLSearchParams();
+    if (params?.read !== undefined) sp.append('read', String(params.read));
+    if (params?.skip !== undefined) sp.append('skip', String(params.skip));
+    if (params?.limit !== undefined) sp.append('limit', String(params.limit));
+    const q = sp.toString();
+    return api.get(`/api/message/my${q ? `?${q}` : ''}`);
+  },
+
+  // 新：未读数量
+  unreadCount: (): Promise<ApiResponse<number>> => api.get('/api/message/my/unread-count'),
+
   // 创建消息（投递给接收人）
   createMessage: (data: import('@/types').MessageCreateData): Promise<ApiResponse<import('@/types').MessageResponse>> => {
     return api.post('/api/message', data);
   },
 
-  // 标记消息为已读
-  markAsRead: (messageId: string): Promise<ApiResponse<null>> => {
-    return api.patch(`/api/message/${messageId}/read`);
+  // 新：标记单条为已读（对接 /api/message/my/{recipient_id}/read）
+  markRead: (recipientId: number): Promise<ApiResponse<{ id: number; read: boolean }>> => {
+    return api.post(`/api/message/my/${recipientId}/read`);
   },
 
-  // 标记所有消息为已读
-  markAllAsRead: (): Promise<ApiResponse<null>> => {
-    return api.patch('/api/message/read-all');
+  // 新：全部标记为已读（对接 /api/message/my/read-all）
+  markAllRead: (): Promise<ApiResponse<{ affected: number }>> => {
+    return api.post('/api/message/my/read-all');
   },
 
-  // 删除消息
+  // 旧：删除消息（保留兼容）
   deleteMessage: (messageId: string): Promise<ApiResponse<null>> => {
     return api.delete(`/api/message/${messageId}`);
   },
