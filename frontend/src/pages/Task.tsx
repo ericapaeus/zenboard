@@ -1010,42 +1010,34 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     <div className="p-6">
       {displayMode === 'full' && (
         <>
-          {/* 搜索区域 */}
+          {/* 标签页 + 右侧搜索区域 */}
           <Card className="mb-6 shadow-sm">
-            <Form
-              form={searchForm}
-              layout="inline"
-              onFinish={handleSearch}
-              className="w-full"
-            >
-              <Row gutter={[16, 16]} className="w-full">
-                <Col xs={24} sm={12} md={8} lg={6}>
-                  <Form.Item name="keyword" className="w-full mb-0">
-                    <Input
-                      placeholder="搜索任务标题、内容、处理人或项目"
-                      prefix={<SearchOutlined className="text-gray-400" />}
-                      allowClear
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={8} lg={6}>
-                  <Form.Item name="member" className="w-full mb-0">
-                    <Select placeholder="选择处理人" allowClear>
-                      <Option value="all">全部成员</Option>
-                      {mockUsers.map(user => (
-                        <Option key={user} value={user}>{user}</Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={24} md={8} lg={12}>
-                  <Space>
-                    <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
-                      搜索
-                    </Button>
-                    <Button onClick={handleReset} icon={<SearchOutlined />}>
-                      重置
-                    </Button>
+            <Tabs 
+              activeKey={activeTab} 
+              onChange={setActiveTab}
+              tabBarExtraContent={
+                <Form form={searchForm} layout="inline" onFinish={handleSearch}>
+                  <Space wrap size="small" align="center">
+                    <Form.Item name="keyword" className="mb-0">
+                      <Input
+                        placeholder="搜索任务标题、内容、处理人或项目"
+                        prefix={<SearchOutlined className="text-gray-400" />}
+                        allowClear
+                        style={{ width: 240 }}
+                      />
+                    </Form.Item>
+                    <Form.Item name="member" className="mb-0">
+                      <Select placeholder="选择处理人" allowClear style={{ width: 160 }}>
+                        <Option value="all">全部成员</Option>
+                        {mockUsers.map(user => (
+                          <Option key={user} value={user}>{user}</Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                    <Space.Compact>
+                      <Button htmlType="submit" icon={<SearchOutlined />}>搜索</Button>
+                      <Button onClick={handleReset}>重置</Button>
+                    </Space.Compact>
                     <Button 
                       type="primary" 
                       icon={<PlusOutlined />} 
@@ -1055,16 +1047,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                       添加
                     </Button>
                   </Space>
-                </Col>
-              </Row>
-            </Form>
-          </Card>
-
-          {/* 标签页 */}
-          <Card className="mb-6 shadow-sm">
-            <Tabs 
-              activeKey={activeTab} 
-              onChange={setActiveTab}
+                </Form>
+              }
               items={[
                 {
                   key: 'pending',

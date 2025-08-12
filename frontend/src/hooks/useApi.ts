@@ -17,7 +17,8 @@ import type {
   DocumentQueryParams,
   UploadResponse,
   UseApiState,
-  UseApiReturn
+  UseApiReturn,
+  MessageCreateData
 } from '@/types';
 
 // ==================== 通用 API Hook ====================
@@ -137,6 +138,32 @@ export function useApi<T>(
     refetch,
     setData,
   };
+}
+
+// ==================== 消息中心 Hooks ====================
+export const useCreateMessage = () => {
+  const [loading, setLoading] = useState(false);
+
+  const createMessage = async (payload: MessageCreateData) => {
+    setLoading(true);
+    try {
+      const response = await messageApi.createMessage(payload);
+      if (response.success) {
+        message.success('消息已创建并投递');
+        return response.data;
+      } else {
+        message.error(response.message || '创建消息失败');
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      message.error('创建消息失败');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { createMessage, loading };
 }
 
 // ==================== 认证相关 Hooks ====================

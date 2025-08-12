@@ -415,6 +415,11 @@ export const messageApi = {
     return api.get(`/api/message${query ? `?${query}` : ''}`);
   },
 
+  // 创建消息（投递给接收人）
+  createMessage: (data: import('@/types').MessageCreateData): Promise<ApiResponse<import('@/types').MessageResponse>> => {
+    return api.post('/api/message', data);
+  },
+
   // 标记消息为已读
   markAsRead: (messageId: string): Promise<ApiResponse<null>> => {
     return api.patch(`/api/message/${messageId}/read`);

@@ -33,7 +33,8 @@ import {
   useAddComment,
   useFetchDocumentComments,
   useProjects,
-  useAuthUsers
+  useAuthUsers,
+  useCreateMessage
 } from '@/hooks/useApi';
 import type { 
   Document, 
@@ -124,6 +125,7 @@ const DocumentPage: React.FC = () => {
   const { deleteDocument, loading: deleteLoading } = useDeleteDocument();
   const { addComment, loading: addCommentLoading } = useAddComment();
   const { fetchComments, loading: fetchCommentsLoading } = useFetchDocumentComments();
+  const { createMessage } = useCreateMessage();
 
   // 获取单个文档评论的 hook
   const getDocumentComments = useCallback(async (documentId: number) => {
@@ -307,6 +309,28 @@ const DocumentPage: React.FC = () => {
             user_ids: values.user_ids
           };
           await updateDocument(editingDraftId, updateData);
+
+          // 文档更新成功后，尝试创建消息（不阻塞流程）
+          try {
+            await createMessage({
+              type: 'document',
+              level: 'info',
+              title: `文档已更新：${values.title || '无标题'}`,
+              content: '文档内容已更新',
+              entity_type: 'document',
+              entity_id: editingDraftId,
+              data_json: JSON.stringify({
+                action: 'updated',
+                title: values.title || '无标题',
+                project_id: values.project_id || null,
+                user_ids: values.user_ids || []
+              }),
+              recipient_user_ids: values.user_ids || []
+            });
+          } catch (e) {
+            console.error('创建更新消息失败：', e);
+          }
+
           setIsModalOpen(false);
           setEditingDraftId(null);
           setEditingForDiaries(false);
@@ -337,7 +361,29 @@ const DocumentPage: React.FC = () => {
           project_id: values.project_id,
           user_ids: values.user_ids
         };
-        await createDocument(createData);
+        const created = await createDocument(createData);
+
+        // 文档创建成功后，尝试创建消息（不阻塞流程）
+        try {
+          await createMessage({
+            type: 'document',
+            level: 'info',
+            title: `新文档：${values.title || '无标题'}`,
+            content: '创建了新文档',
+            entity_type: 'document',
+            entity_id: created?.id,
+            data_json: JSON.stringify({
+              action: 'created',
+              title: values.title || '无标题',
+              project_id: values.project_id || null,
+              user_ids: values.user_ids || []
+            }),
+            recipient_user_ids: values.user_ids || []
+          });
+        } catch (e) {
+          console.error('创建新建消息失败：', e);
+        }
+
         setIsModalOpen(false);
         // 重新获取文档列表，确保显示最新数据
         refetchDocuments();

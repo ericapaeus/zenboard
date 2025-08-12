@@ -139,6 +139,32 @@ export interface UploadResponse {
   mime_type: string;
 }
 
+// 消息中心相关类型（用于创建消息与返回值）
+export interface MessageCreateData {
+  type: string;
+  level?: 'info' | 'warning' | 'error';
+  title: string;
+  content?: string;
+  entity_type?: 'contract' | 'document' | 'task' | 'project';
+  entity_id?: number;
+  actor_id?: number;
+  data_json?: string;
+  recipient_user_ids: number[];
+}
+
+export interface MessageResponse {
+  id: number;
+  type: string;
+  level: 'info' | 'warning' | 'error';
+  title: string;
+  content?: string;
+  entity_type?: 'contract' | 'document' | 'task' | 'project';
+  entity_id?: number;
+  actor_id?: number;
+  data_json?: string;
+  created_at: string;
+}
+
 // 通用状态管理类型
 export interface UseApiState<T> {
   data: T | null;

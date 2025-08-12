@@ -3,7 +3,7 @@ from config import configure_logging, CORS_ORIGINS
 from fastapi import APIRouter
 
 # 导入所有API路由
-from . import task, comments, wechat_auth, upload, document, document_comments, project
+from . import task, comments, wechat_auth, upload, document, document_comments, project, message
 
 # 创建一个主API路由器，用于聚合所有子路由
 api_router = APIRouter()
@@ -15,7 +15,8 @@ api_router.include_router(task.router, prefix="/task", tags=["任务管理"])
 api_router.include_router(document.router, prefix="/document", tags=["文档管理"])
 api_router.include_router(document_comments.router, prefix="/document-comment", tags=["文档评论"])
 api_router.include_router(comments.router, prefix="/comment", tags=["评论管理"])  # 其他模块在用
-api_router.include_router(project.router, prefix="/project", tags=["项目管理"])
+api_router.include_router(project.router, prefix="/project", tags=["项目管理"]) 
+api_router.include_router(message.router, prefix="/message", tags=["消息中心"])
 
 import logging
 # 在应用启动时配置日志
