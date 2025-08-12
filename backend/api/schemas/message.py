@@ -38,6 +38,7 @@ class UserNotificationResponse(BaseModel):
     entity_type: Optional[str]
     entity_id: Optional[int]
     actor_id: Optional[int]
+    actor_name: Optional[str] = None
     data_json: Optional[str]
     created_at: datetime
     read: bool

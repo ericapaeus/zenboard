@@ -12,6 +12,9 @@ router = APIRouter(tags=["消息中心"])
 @router.post("/", response_model=ApiResponse[MessageResponse], summary="创建消息并投递给接收人")
 async def create_message(payload: MessageCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     try:
+        # 默认使用当前登录用户作为触发者
+        if payload.actor_id is None:
+            payload.actor_id = current_user.id
         svc = MessageService(db)
         result = await svc.create_message(payload)
         return ApiResponse(code=201, message="创建成功", data=result, success=True)

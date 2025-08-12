@@ -2,6 +2,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from models.message import Message, MessageRecipient
+from models.user import User
 from api.schemas.message import MessageCreate, MessageResponse, UserNotificationResponse
 from datetime import datetime
 
@@ -57,6 +58,11 @@ class MessageService:
         result: List[UserNotificationResponse] = []
         for r in rows:
             m = r.message
+            # 查询触发者名称（可空）
+            actor_name = None
+            if m.actor_id:
+                user = self.db.get(User, m.actor_id)
+                actor_name = user.name if user and user.name else None
             result.append(UserNotificationResponse(
                 id=r.id,
                 type=m.type,
@@ -66,6 +72,7 @@ class MessageService:
                 entity_type=m.entity_type,
                 entity_id=m.entity_id,
                 actor_id=m.actor_id,
+                actor_name=actor_name,
                 data_json=m.data_json,
                 created_at=m.created_at,
                 read=r.read,
