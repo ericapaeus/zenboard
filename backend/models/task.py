@@ -15,7 +15,7 @@ class TaskVisibility(str, enum.Enum):
     PRIVATE = "private"
 
 class Task(Base):
-    __tablename__ = "tasks"
+    __tablename__ = "task"
     __table_args__ = {'comment': '任务表，记录项目任务、分配、状态等信息'}
 
     id = Column(Integer, primary_key=True, index=True, comment="主键ID")
@@ -35,10 +35,10 @@ class Task(Base):
     estimated_hours = Column(Integer, nullable=True, comment="估算工时(小时)")
     
     # 外键
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True, comment="所属项目ID(公开任务可能没有项目)")  # 公开任务可能没有项目
-    parent_task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True, comment="父任务ID(子任务)")  # 子任务
-    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="创建者用户ID")
-    assignee_id = Column(Integer, ForeignKey("users.id"), nullable=True, comment="被分配人用户ID")
+    project_id = Column(Integer, ForeignKey("project.id"), nullable=True, comment="所属项目ID(公开任务可能没有项目)")  # 公开任务可能没有项目
+    parent_task_id = Column(Integer, ForeignKey("task.id"), nullable=True, comment="父任务ID(子任务)")  # 子任务
+    creator_id = Column(Integer, ForeignKey("user.id"), nullable=False, comment="创建者用户ID")
+    assignee_id = Column(Integer, ForeignKey("user.id"), nullable=True, comment="被分配人用户ID")
     
     # 时间戳
     created_at = Column(DateTime, default=func.now(), comment="创建时间")

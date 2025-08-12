@@ -262,6 +262,7 @@ async def check_first_user(
 ):
     """
     检查当前用户是否为系统首个用户
+    如果是第一个用户，自动设置为管理员并更新状态为已通过
     """
     try:
         # 查询数据库中ID最小的用户
@@ -281,11 +282,46 @@ async def check_first_user(
         # 判断当前用户是否是第一个用户（ID最小的用户）
         is_first_user = current_user.id == first_user.id
         
+        # 如果是第一个用户，自动设置为管理员并更新状态
+        if is_first_user:
+            try:
+                # 更新用户角色为管理员，状态为已通过
+                current_user.role = "管理员"
+                current_user.status = "已通过"
+                db.commit()
+                
+                logger.info(f"用户 {current_user.id} 自动设置为管理员")
+                
+                return ApiResponse(
+                    success=True,
+                    message="检测到您是系统第一个用户，已自动设置为管理员！",
+                    data={
+                        "isFirstUser": True,
+                        "autoUpgraded": True,
+                        "newRole": "管理员",
+                        "newStatus": "已通过"
+                    },
+                    code=200
+                )
+            except Exception as update_error:
+                db.rollback()
+                logger.error(f"自动升级第一个用户失败: {update_error}")
+                # 即使更新失败，也返回是第一个用户的信息
+                return ApiResponse(
+                    success=True,
+                    message="检测到您是系统第一个用户",
+                    data={
+                        "isFirstUser": True,
+                        "autoUpgraded": False
+                    },
+                    code=200
+                )
+        
         return ApiResponse(
             success=True,
             message="查询成功",
             data={
-                "isFirstUser": is_first_user
+                "isFirstUser": False
             },
             code=200
         )
@@ -298,7 +334,7 @@ async def check_first_user(
             code=500
         ) 
 
-@router.get("/users", response_model=ApiResponse[list], summary="获取用户列表")
+@router.get("/user", response_model=ApiResponse[list], summary="获取用户列表")
 async def get_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -351,7 +387,7 @@ async def get_users(
             code=500
         )
 
-@router.post("/users/{user_id}/approve", response_model=ApiResponse[dict], summary="审批用户")
+@router.post("/user/{user_id}/approve", response_model=ApiResponse[dict], summary="审批用户")
 async def approve_user(
     user_id: int,
     db: Session = Depends(get_db),
@@ -402,7 +438,7 @@ async def approve_user(
             code=500
         )
 
-@router.post("/users/{user_id}/reject", response_model=ApiResponse[dict], summary="拒绝用户")
+@router.post("/user/{user_id}/reject", response_model=ApiResponse[dict], summary="拒绝用户")
 async def reject_user(
     user_id: int,
     db: Session = Depends(get_db),
@@ -453,7 +489,7 @@ async def reject_user(
             code=500
         ) 
 
-@router.put("/users/{user_id}", response_model=ApiResponse[UserResponse], summary="更新用户信息")
+@router.put("/user/{user_id}", response_model=ApiResponse[UserResponse], summary="更新用户信息")
 async def update_user(
     user_id: int,
     user_update: UserUpdate,
@@ -527,7 +563,7 @@ async def update_user(
             code=500
         )
 
-@router.delete("/users/{user_id}", response_model=ApiResponse[dict], summary="删除用户")
+@router.delete("/user/{user_id}", response_model=ApiResponse[dict], summary="删除用户")
 async def delete_user(
     user_id: int,
     db: Session = Depends(get_db),

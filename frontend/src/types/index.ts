@@ -88,6 +88,9 @@ export interface Document {
   author_id: number;
   author_name?: string;
   author_avatar?: string;
+  // 关联信息（用于默认选中）
+  project_id?: number;
+  specific_user_ids?: number[];
 }
 
 export interface DocumentComment {
@@ -105,13 +108,15 @@ export interface DocumentComment {
 export interface CreateDocumentData {
   title: string;
   content: string;
-  visibility: 'public' | 'project' | 'private' | 'specific';
+  project_id?: number;
+  user_ids?: number[];
 }
 
 export interface UpdateDocumentData {
   title: string;
   content: string;
-  visibility: 'public' | 'project' | 'private' | 'specific';
+  project_id?: number;
+  user_ids?: number[];
 }
 
 export interface AddCommentData {

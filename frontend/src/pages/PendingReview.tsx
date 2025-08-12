@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Card, Result, Button, Spin, message } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { useCheckUserStatus } from '@/hooks/useApi';
+import { useCheckUserStatus, useCheckFirstUser } from '@/hooks/useApi';
 
 export default function PendingReview() {
   const navigate = useNavigate();
   const { checkUserStatus, loading, userInfo, setUserInfo } = useCheckUserStatus();
+  const { checkFirstUser, loading: checkFirstUserLoading, error: checkFirstUserError } = useCheckFirstUser();
 
   // 检查用户状态
   const handleCheckUserStatus = async () => {
@@ -30,7 +31,41 @@ export default function PendingReview() {
     }
   };
 
+  // 检查是否为第一个用户
+  const handleCheckFirstUser = async () => {
+    try {
+      const result = await checkFirstUser();
+      if (result?.isFirstUser) {
+        if (result.autoUpgraded) {
+          // 自动升级成功
+          message.success("检测到您是系统第一个用户，已自动设置为管理员！");
+          // 更新本地存储的用户信息
+          const currentUserInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+          const updatedUserInfo = {
+            ...currentUserInfo,
+            role: result.newRole,
+            status: result.newStatus
+          };
+          localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
+          
+          // 延迟后重新检查用户状态，应该会显示为已通过并跳转
+          setTimeout(() => {
+            handleCheckUserStatus();
+          }, 1500);
+        } else {
+          // 检测到是第一个用户但自动升级失败
+          message.warning("检测到您是系统第一个用户，但自动升级失败，请联系管理员");
+        }
+      }
+    } catch (error) {
+      console.error("检查第一个用户失败:", error);
+    }
+  };
+
   useEffect(() => {
+    // 先检查是否为第一个用户
+    handleCheckFirstUser();
+    // 然后检查用户状态
     handleCheckUserStatus();
     // 每30秒检查一次状态
     const interval = setInterval(handleCheckUserStatus, 30000);
@@ -48,7 +83,7 @@ export default function PendingReview() {
     navigate("/login");
   };
 
-  if (loading) {
+  if (loading || checkFirstUserLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -59,6 +94,11 @@ export default function PendingReview() {
         </Card>
       </div>
     );
+  }
+
+  // 处理第一个用户检查错误
+  if (checkFirstUserError) {
+    console.error("检查第一个用户时发生错误:", checkFirstUserError);
   }
 
   return (

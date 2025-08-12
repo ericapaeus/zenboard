@@ -4,7 +4,7 @@ from sqlalchemy.sql import func
 from database.base import Base
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "user"
     __table_args__ = {'comment': '用户表，存储系统用户的基本信息和微信相关信息'}
 
     id = Column(Integer, primary_key=True, index=True, comment="主键ID")
@@ -36,7 +36,6 @@ class User(Base):
     projects = relationship("ProjectMembership", back_populates="user")
     tasks = relationship("Task", foreign_keys="Task.assignee_id", back_populates="assignee")
     created_tasks = relationship("Task", foreign_keys="Task.creator_id", back_populates="creator")
-    diary_entries = relationship("DiaryEntry", back_populates="author")
     comments = relationship("Comment", back_populates="author")
     # 文档关系（与 Document.author back_populates 匹配）
     documents = relationship("Document", back_populates="author", cascade="all, delete-orphan")

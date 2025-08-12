@@ -10,10 +10,10 @@ import { appConfig } from '@/config/app';
 // 简化的路由标签映射
 const routeLabels: Record<string, string> = {
   '/': '控制台',
-  '/users': '用户管理',
-  '/users/list': '用户列表',
-  '/projects/list': '项目列表',
-  '/tasks/list': '任务列表',
+  '/user': '用户管理',
+  '/user/list': '用户列表',
+  '/project/list': '项目列表',
+  '/task/list': '任务列表',
   '/document/list': '文档列表',
   '/settings/system': '系统配置',
   '/profile': '个人资料',
@@ -24,19 +24,19 @@ function getBreadcrumbItems(pathname: string) {
   const items = [{ title: '控制台' }];
   
   // 特殊处理各种列表路径，显示完整的三级路径
-  if (pathname === '/users/list') {
+  if (pathname === '/user/list') {
     items.push({ title: '用户管理' });
     items.push({ title: '用户列表' });
     return items;
   }
   
-  if (pathname === '/projects/list') {
+  if (pathname === '/project/list') {
     items.push({ title: '任务管理' });
     items.push({ title: '项目列表' });
     return items;
   }
   
-  if (pathname === '/tasks/list') {
+  if (pathname === '/task/list') {
     items.push({ title: '任务管理' });
     items.push({ title: '任务列表' });
     return items;

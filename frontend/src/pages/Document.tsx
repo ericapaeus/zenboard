@@ -32,9 +32,15 @@ import {
   useDocumentComments, 
   useAddComment,
   useFetchDocumentComments,
-  type Document,
-  type DocumentComment
+  useProjects,
+  useAuthUsers
 } from '@/hooks/useApi';
+import type { 
+  Document, 
+  DocumentComment, 
+  CreateDocumentData, 
+  UpdateDocumentData 
+} from '@/types';
 
 // Markdown normalize so titles/lists render correctly even without space
 function normalizeMarkdown(text: string): string {
@@ -59,28 +65,13 @@ const { RangePicker } = DatePicker;
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-const visibilityTagColor: Record<DiaryEntry['type'], string> = {
-  public: 'green',
-  project: 'blue',
-  assigned: 'purple',
-  private: 'red',
-};
-
-type Visibility = Document['visibility'];
-function mapTypeToVisibility(t: DiaryEntry['type']): Visibility {
-  return t === 'assigned' ? 'specific' : (t as any);
-}
-function mapVisibilityToType(v: Visibility): DiaryEntry['type'] {
-  return v === 'specific' ? 'assigned' : (v as any);
-}
-
 interface DiaryEntry {
   id: number;
   date: string; // 创建时间
-  type: 'public' | 'project' | 'assigned' | 'private';
   title?: string;
   content: string;
-  members?: string[];
+  project_id?: number;
+  members?: number[]; // 指定用户ID
   status: 'draft' | 'submitted';
   comments?: DocumentComment[];
 }
@@ -96,8 +87,6 @@ const DocumentPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
-  // 删除 diaryType 相关 useState
-  // const [diaryType, setDiaryType] = useState<'public' | 'project' | 'assigned' | 'private'>('public');
   const [drafts, setDrafts] = useState<DiaryEntry[]>([]);
   const [editingDraftId, setEditingDraftId] = useState<number | null>(null);
   const [editingForDiaries, setEditingForDiaries] = useState<boolean>(false);
@@ -115,11 +104,9 @@ const DocumentPage: React.FC = () => {
   const [deleteTargetItem, setDeleteTargetItem] = useState<DiaryEntry | null>(null);
   const [commentsData, setCommentsData] = useState<Record<number, DocumentComment[]>>({});
 
-  // 使用 hooks
-  const searchFormValues = searchForm.getFieldsValue();
-  // 删除 type 字段相关逻辑
-  // const type = searchFormValues?.type as DiaryEntry['type'] | undefined;
-  // const visibility = type ? mapTypeToVisibility(type) : undefined;
+  // 使用 hooks 获取项目和用户数据
+  const { data: projectsData, loading: projectsLoading } = useProjects();
+  const { data: usersData, loading: usersLoading } = useAuthUsers();
   
   const { 
     data: documentsData, 
@@ -129,8 +116,6 @@ const DocumentPage: React.FC = () => {
   } = useDocuments({
     skip: (currentPage - 1) * pageSize,
     limit: pageSize,
-    // 删除 visibility 筛选条件
-    // visibility,
     order_by: '-id'
   });
 
@@ -180,16 +165,18 @@ const DocumentPage: React.FC = () => {
   }, [documentsData]);
 
   function mapDoc(doc: Document): DiaryEntry {
-    return {
-      id: doc.id,
-      title: doc.title,
-      content: doc.content,
-      type: mapVisibilityToType(doc.visibility),
-      date: dayjs(doc.created_at).format('YYYY-MM-DD HH:mm:ss'), // 格式化时间
-      status: 'submitted',
-      comments: [],
-    };
-  }
+  const anyDoc: any = doc as any;
+  return {
+    id: doc.id,
+    title: doc.title,
+    content: doc.content,
+    date: dayjs(doc.created_at).format('YYYY-MM-DD HH:mm:ss'), // 格式化时间
+    status: 'submitted',
+    comments: [],
+    project_id: anyDoc.project_id,
+    members: anyDoc.specific_user_ids || anyDoc.user_ids || [],
+  };
+}
 
   // 加载文档列表
   const loadDocuments = useCallback(async (page = currentPage, size = pageSize) => {
@@ -215,10 +202,6 @@ const DocumentPage: React.FC = () => {
       const kw = String(values.keyword).toLowerCase();
       result = result.filter((d) => (d.title || '').toLowerCase().includes(kw));
     }
-    // 删除 type 筛选条件
-    // if (values?.type && values.type !== 'all') {
-    //   result = result.filter((d) => d.type === values.type);
-    // }
     if (values?.member && values.member !== 'all') {
       result = result.filter((d) => (d.members || []).includes(values.member));
     }
@@ -244,10 +227,6 @@ const DocumentPage: React.FC = () => {
   }, [diaries, selectedDateRange]);
 
   const handleSearch = useCallback((values: any) => {
-    // 获取可见性筛选条件
-    // const type = values?.type as DiaryEntry['type'] | undefined;
-    // const visibility = type ? mapTypeToVisibility(type) : undefined;
-    
     // 更新分页参数，触发重新加载
     setCurrentPage(1);
     // 折叠所有展开的列表项
@@ -272,12 +251,15 @@ const DocumentPage: React.FC = () => {
   const showModal = useCallback(() => {
     setIsModalOpen(true);
     form.resetFields();
-    // 删除 showModal/setDiaryType 相关
-    // setDiaryType('public');
     setEditingDraftId(null);
     setEditingForDiaries(false);
     // default values
-    form.setFieldsValue({ type: 'public', content: '', title: '' });
+    form.setFieldsValue({ 
+      content: '', 
+      title: '',
+      project_id: undefined,
+      user_ids: []
+    });
   }, [form]);
 
   const handleCancel = useCallback(() => {
@@ -291,11 +273,9 @@ const DocumentPage: React.FC = () => {
         const newDraft: DiaryEntry = {
           id: Date.now(),
           date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-          // 删除 diaryType 相关
-          // type: diaryType,
           title: values.title,
           content: values.content,
-          members: values.members,
+          members: values.user_ids,
           status: 'draft',
         };
 
@@ -320,12 +300,13 @@ const DocumentPage: React.FC = () => {
       if (editingDraftId) {
         if (editingForDiaries) {
           // 更新文档
-          await updateDocument(editingDraftId, {
-            title: values.title,
+          const updateData: UpdateDocumentData = {
+            title: values.title || '无标题',
             content: values.content,
-            // 删除 diaryType 相关
-            // visibility: mapTypeToVisibility(diaryType),
-          });
+            project_id: values.project_id,
+            user_ids: values.user_ids
+          };
+          await updateDocument(editingDraftId, updateData);
           setIsModalOpen(false);
           setEditingDraftId(null);
           setEditingForDiaries(false);
@@ -337,11 +318,9 @@ const DocumentPage: React.FC = () => {
               d.id === editingDraftId
                 ? {
                     ...d,
-                    // 删除 diaryType 相关
-                    // type: diaryType,
                     title: values.title,
                     content: values.content,
-                    members: values.members,
+                    members: values.user_ids,
                   }
                 : d,
             ),
@@ -352,12 +331,13 @@ const DocumentPage: React.FC = () => {
         }
       } else {
         // 新建文档
-        await createDocument({
+        const createData: CreateDocumentData = {
           title: values.title || '无标题',
           content: values.content,
-          // 删除 diaryType 相关
-          // visibility: mapTypeToVisibility(diaryType),
-        });
+          project_id: values.project_id,
+          user_ids: values.user_ids
+        };
+        await createDocument(createData);
         setIsModalOpen(false);
         // 重新获取文档列表，确保显示最新数据
         refetchDocuments();
@@ -377,24 +357,24 @@ const DocumentPage: React.FC = () => {
     setIsModalOpen(true);
     setEditingDraftId(draft.id);
     setEditingForDiaries(false);
-    // 删除 handleEditDraft/setDiaryType 相关
-    // setDiaryType(draft.type);
     form.setFieldsValue({
-      type: draft.type,
       title: draft.title,
       content: draft.content,
-      members: draft.members,
+      user_ids: draft.members,
     });
   }, [form]);
 
   const handleEditDiary = useCallback((item: DiaryEntry) => {
-    setIsModalOpen(true);
-    setEditingDraftId(item.id);
-    setEditingForDiaries(true);
-    // 删除 handleEditDiary/setDiaryType 相关
-    // setDiaryType(item.type);
-    form.setFieldsValue({ type: item.type, title: item.title, content: item.content, members: item.members });
-  }, [form]);
+  setIsModalOpen(true);
+  setEditingDraftId(item.id);
+  setEditingForDiaries(true);
+  form.setFieldsValue({ 
+  title: item.title, 
+  content: item.content, 
+  project_id: item.project_id,
+    user_ids: item.members || []
+  });
+}, [form]);
 
   const handleDeleteDiary = useCallback((item: DiaryEntry) => {
     console.log('🔥 删除函数被调用 - handleDeleteDiary', {
@@ -519,20 +499,31 @@ const DocumentPage: React.FC = () => {
 
   // Compute member options from data
   const memberOptions = useMemo(() => {
-    const setIds = new Set<string>();
+    const setIds = new Set<number>();
     diaries.forEach((d) => (d.members || []).forEach((m) => setIds.add(m)));
-    return Array.from(setIds).map((m) => ({ label: m, value: m }));
-  }, [diaries]);
+    return Array.from(setIds).map((id) => ({
+      label: usersData?.find(u => u.id === id)?.name || `用户${id}`,
+      value: id
+    }));
+  }, [diaries, usersData]);
 
-  // 在组件顶部 useMemo 处添加 mock 选项
-  const projectOptions = [
-    { label: '项目A', value: 'projectA' },
-    { label: '项目B', value: 'projectB' },
-  ];
-  const userOptions = [
-    { label: '用户1', value: 'user1' },
-    { label: '用户2', value: 'user2' },
-  ];
+  // 从 API 获取项目选项
+  const projectOptions = useMemo(() => {
+    if (!projectsData) return [];
+    return projectsData.map(project => ({
+      label: project.name,
+      value: project.id
+    }));
+  }, [projectsData]);
+
+  // 从 API 获取用户选项
+  const userOptions = useMemo(() => {
+    if (!usersData) return [];
+    return usersData.map(user => ({
+      label: user.name || `用户${user.id}`,
+      value: user.id
+    }));
+  }, [usersData]);
 
   return (
     <div style={{ padding: 24 }}>
@@ -565,23 +556,6 @@ const DocumentPage: React.FC = () => {
                 />
               </Form.Item>
             </Col>
-            {/* 删除弹窗表单左侧的类型选择 Form.Item */}
-            {/* <Col flex="none">
-              <Form.Item name="type" style={{ marginBottom: 0 }}>
-                <Select
-                  placeholder="选择可见性"
-                  allowClear
-                  style={{ width: 140 }}
-                  options={[
-                    { label: '全部', value: 'all' },
-                    { label: '公开', value: 'public' },
-                    { label: '项目', value: 'project' },
-                    { label: '指定', value: 'assigned' },
-                    { label: '私有', value: 'private' },
-                  ]}
-                />
-              </Form.Item>
-            </Col> */}
             {memberOptions.length > 0 && (
               <Col flex="none">
                 <Form.Item name="member" style={{ marginBottom: 0 }}>
@@ -632,7 +606,6 @@ const DocumentPage: React.FC = () => {
                         <Text strong style={{ fontSize: 16, minWidth: 0 }}>
                           {item.title || '无标题'}
                         </Text>
-                        <Tag color={visibilityTagColor[item.type]}>{item.type}</Tag>
                       </div>
                       <Text type="secondary" style={{ fontSize: 12 }}>{item.date}</Text>
                     </div>
@@ -763,21 +736,37 @@ const DocumentPage: React.FC = () => {
         <Form
           form={form}
           layout="vertical"
-          initialValues={{ type: 'public', content: '', title: '' }}
+          initialValues={{ 
+            content: '', 
+            title: '',
+            project_id: undefined,
+            user_ids: []
+          }}
         >
-          <Form.Item label="所属项目" name="project" style={{ marginBottom: 16 }}>
-            <Select placeholder="请选择项目" options={projectOptions} />
+          
+          <Form.Item label="指定项目" name="project_id" style={{ marginBottom: 16 }}>
+            <Select 
+              placeholder="请选择项目" 
+              options={projectOptions}
+              loading={projectsLoading}
+              allowClear
+            />
           </Form.Item>
-          <Form.Item label="指定用户" name="users" style={{ marginBottom: 16 }}>
+          
+          <Form.Item label="指定用户" name="user_ids" style={{ marginBottom: 16 }}>
             <Select
               mode="multiple"
               placeholder="请选择用户"
               options={userOptions}
+              loading={usersLoading}
+              allowClear
             />
           </Form.Item>
+          
           <Form.Item label="标题" name="title" style={{ marginBottom: 16 }}>
             <Input placeholder="请输入标题（可选）" />
           </Form.Item>
+          
           <Form.Item
             label="内容"
             name="content"
@@ -786,6 +775,7 @@ const DocumentPage: React.FC = () => {
           >
             <TextArea rows={10} placeholder="支持 Markdown 语法" />
           </Form.Item>
+          
           <Card size="small" title="预览" style={{ marginBottom: 16 }}>
             <div
               style={{
@@ -801,6 +791,7 @@ const DocumentPage: React.FC = () => {
               </ReactMarkdown>
             </div>
           </Card>
+          
           <Form.Item style={{ textAlign: 'right', marginTop: 24 }}>
             <Button type="primary" onClick={handleSubmit} loading={createLoading || updateLoading}>
               提交
@@ -836,12 +827,6 @@ const DocumentPage: React.FC = () => {
               <div style={{ marginBottom: 8 }}>
                 <Text strong>标题：</Text>
                 <Text>{deleteTargetItem.title || '无标题'}</Text>
-              </div>
-              <div style={{ marginBottom: 8 }}>
-                <Text strong>类型：</Text>
-                <Tag color={visibilityTagColor[deleteTargetItem.type]}>
-                  {deleteTargetItem.type}
-                </Tag>
               </div>
               <div>
                 <Text strong>创建时间：</Text>

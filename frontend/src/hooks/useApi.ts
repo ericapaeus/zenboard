@@ -673,22 +673,45 @@ export const useUpdateProfile = () => {
 // 检查首个用户 Hook
 export const useCheckFirstUser = () => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<{
+    isFirstUser: boolean;
+    autoUpgraded?: boolean;
+    newRole?: string;
+    newStatus?: string;
+  } | null>(null);
 
-  const checkFirstUser = async () => {
+  const checkFirstUser = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const response = await authApi.checkFirstUser();
-      return response;
+      const response = await fetch('/api/auth/wechat/check-first-user', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        setData(result.data);
+        return result.data;
+      } else {
+        const errorMsg = result.message || "检查第一个用户失败";
+        setError(errorMsg);
+        throw new Error(errorMsg);
+      }
     } catch (error) {
-      console.error("检查首个用户失败:", error);
-      message.error("检查失败，请重试");
+      const errorMsg = error instanceof Error ? error.message : "检查第一个用户失败";
+      setError(errorMsg);
       throw error;
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  return { checkFirstUser, loading };
+  return { checkFirstUser, loading, error, data };
 };
 
 // ==================== 检查用户状态 Hook ====================

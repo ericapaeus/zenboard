@@ -32,7 +32,7 @@ const hasPermission = (route: RouteConfig): boolean => {
   const userRole = userInfo.role;
   
   // 普通用户不能访问的菜单
-  const restrictedMenus = ['/users', '/settings'];
+  const restrictedMenus = ['/user', '/settings'];
   
   if (userRole === '普通用户') {
     // 检查路径是否在限制列表中，包括子路径
@@ -49,19 +49,19 @@ function getOpenKeys(pathname: string) {
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length > 1) {
     // 特殊处理：项目列表现在在任务管理菜单下
-    if (pathname === '/projects/list') {
-      return ['/tasks'];
+    if (pathname === '/project/list') {
+      return ['/task'];
     }
     // 处理用户列表
-    if (pathname === '/users/list') {
-      return ['/users'];
+    if (pathname === '/user/list') {
+      return ['/user'];
     }
     return [`/${segments[0]}`];
   }
   
   // 处理根路径的情况
-  if (pathname === '/users') {
-    return ['/users'];
+  if (pathname === '/user') {
+    return ['/user'];
   }
   
   return [];

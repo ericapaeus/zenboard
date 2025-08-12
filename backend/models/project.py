@@ -4,7 +4,7 @@ from sqlalchemy.sql import func
 from database.base import Base
 
 class Project(Base):
-    __tablename__ = "projects"
+    __tablename__ = "project"
     __table_args__ = {'comment': '项目表，存储协作项目的基本信息'}
 
     id = Column(Integer, primary_key=True, index=True, comment="主键ID")
@@ -27,6 +27,7 @@ class Project(Base):
     # 关系
     members = relationship("ProjectMembership", back_populates="project")
     tasks = relationship("Task", back_populates="project")
+    documents = relationship("Document", back_populates="project")
 
     def __repr__(self):
         return f"<Project(id={self.id}, name='{self.name}')>" 

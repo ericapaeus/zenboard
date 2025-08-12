@@ -10,7 +10,7 @@ class DocumentComment(Base):
     id = Column(Integer, primary_key=True, index=True, comment="主键ID")
     content = Column(Text, nullable=False, comment="评论内容(Markdown)")
     document_id = Column(Integer, ForeignKey("document.id"), nullable=False, index=True, comment="文档ID")
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="作者用户ID")
+    author_id = Column(Integer, ForeignKey("user.id"), nullable=False, comment="作者用户ID")
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
 

@@ -3,8 +3,8 @@ import { UserOutlined, TeamOutlined, FileTextOutlined, SettingOutlined, UserSwit
 
 // 懒加载页面组件
 const Dashboard = lazy(() => import('../pages/Dashboard'));
-const Users = lazy(() => import('../pages/Users'));
-const Projects = lazy(() => import('../pages/Projects'));
+const UserPage = lazy(() => import('../pages/User'));
+const Project = lazy(() => import('../pages/Project'));
 const Task = lazy(() => import('../pages/Task'));
 const Document = lazy(() => import('../pages/Document'));
 const SystemConfig = lazy(() => import('../pages/SystemConfig'));
@@ -30,31 +30,31 @@ export const routes: RouteConfig[] = [
     meta: { component: Dashboard }
   },
   {
-    path: '/users',
+    path: '/user',
     label: '用户管理',
     icon: React.createElement(UserOutlined),
     children: [
       {
-        path: '/users/list',
+        path: '/user/list',
         label: '用户列表',
         icon: React.createElement(UserSwitchOutlined),
-        meta: { component: Users },
+        meta: { component: UserPage },
       },
     ],
   },
   {
-    path: '/tasks',
+    path: '/task',
     label: '任务管理',
     icon: React.createElement(CheckSquareOutlined),
     children: [
       {
-        path: '/projects/list',
+        path: '/project/list',
         label: '项目列表',
         icon: React.createElement(ProjectOutlined),
-        meta: { parentPath: '/tasks', component: Projects },
+        meta: { parentPath: '/task', component: Project },
       },
       {
-        path: '/tasks/list',
+        path: '/task/list',
         label: '任务列表',
         icon: React.createElement(CheckSquareOutlined),
         meta: { component: Task },
