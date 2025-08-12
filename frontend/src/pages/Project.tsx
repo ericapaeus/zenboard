@@ -1,8 +1,9 @@
 import React from 'react';
-import { Card, Typography, Button, Modal, Form, Input, Select, Avatar, Tag, Space, Row, Col, Statistic, Pagination } from 'antd';
-import { PlusOutlined, UserOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, SearchOutlined } from '@ant-design/icons';
+import { Card, Typography, Button, Modal, Form, Input, Select, Avatar, Tag, Space, Row, Col, Statistic, Pagination, Dropdown } from 'antd';
+import { PlusOutlined, UserOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, SearchOutlined, MoreOutlined, EditOutlined } from '@ant-design/icons';
 import { message } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { generateProjectColor } from '@/utils/colorGenerator';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -14,7 +15,7 @@ interface Project {
   members: string[];
   taskCount: number;
   completedTaskCount: number;
-  color: string;
+  status: 'active' | 'archived';
 }
 
 // Mock user data for demonstration
@@ -28,11 +29,14 @@ const mockUsers = [
 const Projects: React.FC = () => {
   const navigate = useNavigate();
   const [isCreateModalVisible, setIsCreateModalVisible] = React.useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = React.useState(false);
   const [createForm] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [searchForm] = Form.useForm();
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(8);
   const [filteredProjects, setFilteredProjects] = React.useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = React.useState<Project | null>(null);
   const [projects, setProjects] = React.useState<Project[]>([
     {
       id: 'p1',
@@ -41,7 +45,7 @@ const Projects: React.FC = () => {
       members: ['u1', 'u2'],
       taskCount: 12,
       completedTaskCount: 8,
-      color: '#1890ff',
+      status: 'active',
     },
     {
       id: 'p2',
@@ -50,7 +54,7 @@ const Projects: React.FC = () => {
       members: ['u2', 'u3'],
       taskCount: 8,
       completedTaskCount: 5,
-      color: '#52c41a',
+      status: 'active',
     },
     {
       id: 'p3',
@@ -59,7 +63,7 @@ const Projects: React.FC = () => {
       members: ['u1', 'u4'],
       taskCount: 6,
       completedTaskCount: 4,
-      color: '#fa8c16',
+      status: 'active',
     },
     {
       id: 'p4',
@@ -68,7 +72,7 @@ const Projects: React.FC = () => {
       members: ['u3', 'u4'],
       taskCount: 10,
       completedTaskCount: 7,
-      color: '#722ed1',
+      status: 'active',
     },
     {
       id: 'p5',
@@ -77,7 +81,7 @@ const Projects: React.FC = () => {
       members: ['u1', 'u3'],
       taskCount: 15,
       completedTaskCount: 10,
-      color: '#eb2f96',
+      status: 'active',
     },
     {
       id: 'p6',
@@ -86,7 +90,7 @@ const Projects: React.FC = () => {
       members: ['u2', 'u4'],
       taskCount: 9,
       completedTaskCount: 6,
-      color: '#13c2c2',
+      status: 'active',
     },
     {
       id: 'p7',
@@ -95,7 +99,7 @@ const Projects: React.FC = () => {
       members: ['u1', 'u2', 'u3'],
       taskCount: 7,
       completedTaskCount: 4,
-      color: '#fa541c',
+      status: 'active',
     },
     {
       id: 'p8',
@@ -104,7 +108,7 @@ const Projects: React.FC = () => {
       members: ['u3', 'u4'],
       taskCount: 11,
       completedTaskCount: 8,
-      color: '#a0d911',
+      status: 'active',
     },
   ]);
 
@@ -158,10 +162,23 @@ const Projects: React.FC = () => {
     createForm.resetFields();
   };
 
+  const handleEditModalOpen = (project: Project) => {
+    setSelectedProject(project);
+    setIsEditModalVisible(true);
+    editForm.setFieldsValue({
+      name: project.name,
+      description: project.description,
+      members: project.members,
+    });
+  };
+
+  const handleEditModalCancel = () => {
+    setIsEditModalVisible(false);
+    setSelectedProject(null);
+    editForm.resetFields();
+  };
+
   const handleCreateProject = async (values: any) => {
-    const colors = ['#1890ff', '#52c41a', '#faad14', '#722ed1', '#eb2f96', '#13c2c2'];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    
     const newProject: Project = {
       id: `p${Date.now()}`,
       name: values.name,
@@ -169,11 +186,24 @@ const Projects: React.FC = () => {
       members: values.members || [],
       taskCount: 0,
       completedTaskCount: 0,
-      color: randomColor,
+      status: 'active',
     };
     setProjects(prevProjects => [...prevProjects, newProject]);
     message.success('项目创建成功！');
     handleCreateModalCancel();
+  };
+
+  const handleEditProject = async (values: any) => {
+    if (selectedProject) {
+      const updatedProjects = projects.map(project =>
+        project.id === selectedProject.id
+          ? { ...project, ...values }
+          : project
+      );
+      setProjects(updatedProjects);
+      message.success('项目更新成功！');
+      handleEditModalCancel();
+    }
   };
 
   const getMemberNames = (memberIds: string[]) => {
@@ -186,6 +216,74 @@ const Projects: React.FC = () => {
     return mockUsers
       .filter(user => memberIds.includes(user.id))
       .map(user => ({ name: user.name, avatar: user.avatar }));
+  };
+
+  // 项目状态管理
+  const handleArchiveProject = (projectId: string) => {
+    setProjects(prevProjects => 
+      prevProjects.map(project => 
+        project.id === projectId 
+          ? { ...project, status: 'archived' as const }
+          : project
+      )
+    );
+    message.success('项目已归档');
+  };
+
+  const handleActivateProject = (projectId: string) => {
+    setProjects(prevProjects => 
+      prevProjects.map(project => 
+        project.id === projectId 
+          ? { ...project, status: 'active' as const }
+          : project
+      )
+    );
+    message.success('项目已激活');
+  };
+
+  // 获取状态标签
+  const getStatusTag = (status: 'active' | 'archived') => {
+    if (status === 'active') {
+      return <Tag color="green">活跃</Tag>;
+    } else {
+      return <Tag color="default">已归档</Tag>;
+    }
+  };
+
+  // 获取项目操作菜单
+  const getProjectActions = (project: Project) => {
+    const items = [
+      {
+        key: 'view',
+        label: '查看详情',
+        icon: <TeamOutlined />,
+        onClick: () => handleViewProjectDetails(project.id, project.name),
+      },
+      {
+        key: 'edit',
+        label: '编辑项目',
+        icon: <EditOutlined />,
+        onClick: () => handleEditModalOpen(project),
+      },
+    ];
+
+    if (project.status === 'active') {
+      items.push({
+        key: 'archive',
+        label: '归档项目',
+        icon: <CheckCircleOutlined />,
+        onClick: () => handleArchiveProject(project.id),
+      });
+    } else {
+      items.push({
+        key: 'activate',
+        label: '激活项目',
+        icon: <ClockCircleOutlined />,
+        onClick: () => handleActivateProject(project.id),
+      });
+    }
+
+    return items;
   };
 
   // 计算分页数据
@@ -246,26 +344,34 @@ const Projects: React.FC = () => {
       </Card>
 
       <Row gutter={[16, 16]}>
-        {currentProjects.map(project => (
+        {currentProjects.map(project => {
+          // 为每个项目生成唯一的颜色
+          const projectColor = generateProjectColor(project.id);
+          
+          return (
           <Col xs={24} sm={12} lg={8} xl={6} key={project.id}>
             <Card
               hoverable
               className="h-full"
-              style={{ borderTop: `4px solid ${project.color}` }}
+                style={{ borderTop: `4px solid ${projectColor}` }}
               actions={[
-                <Button 
-                  type="link" 
-                  onClick={() => handleViewProjectDetails(project.id, project.name)}
-                  icon={<TeamOutlined />}
-                >
-                  查看详情
-                </Button>
+                  <Dropdown
+                    key="actions"
+                    menu={{ items: getProjectActions(project) }}
+                    placement="bottomRight"
+                    trigger={['click']}
+                  >
+                    <Button type="text" icon={<MoreOutlined />} />
+                  </Dropdown>
               ]}
             >
               <div className="mb-4">
-                <Title level={4} className="mb-2" style={{ color: project.color }}>
+                  <div className="flex justify-between items-start mb-2">
+                    <Title level={4} className="mb-0 flex-1 mr-2" style={{ color: projectColor }}>
                   {project.name}
                 </Title>
+                    {getStatusTag(project.status)}
+                  </div>
                 <Text type="secondary" className="text-sm">
                   {project.description}
                 </Text>
@@ -302,7 +408,7 @@ const Projects: React.FC = () => {
                         className="h-2 rounded-full transition-all duration-300"
                         style={{ 
                           width: `${(project.completedTaskCount / project.taskCount) * 100}%`,
-                          backgroundColor: project.color
+                            backgroundColor: projectColor
                         }}
                       />
                     </div>
@@ -318,7 +424,7 @@ const Projects: React.FC = () => {
                     {getMemberAvatars(project.members).map((member, index) => (
                       <Avatar 
                         key={index} 
-                        style={{ backgroundColor: project.color }}
+                          style={{ backgroundColor: projectColor }}
                         size="small"
                       >
                         {member.avatar}
@@ -334,7 +440,8 @@ const Projects: React.FC = () => {
               </div>
             </Card>
           </Col>
-        ))}
+          );
+        })}
       </Row>
 
       {/* 分页 */}
@@ -355,7 +462,7 @@ const Projects: React.FC = () => {
 
       {/* Create Project Modal */}
       <Modal
-        title="创建新项目"
+        title="添加项目"
         visible={isCreateModalVisible}
         onCancel={handleCreateModalCancel}
         footer={null}
@@ -392,6 +499,50 @@ const Projects: React.FC = () => {
           <Form.Item>
             <Button type="primary" htmlType="submit" block>
               创建项目
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Edit Project Modal */}
+      <Modal
+        title="编辑项目"
+        visible={isEditModalVisible}
+        onCancel={handleEditModalCancel}
+        footer={null}
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleEditProject}
+        >
+          <Form.Item
+            name="name"
+            label="项目名称"
+            rules={[{ required: true, message: '请输入项目名称！' }]}
+          >
+            <Input placeholder="请输入项目名称" />
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label="项目描述"
+            rules={[{ required: true, message: '请输入项目描述！' }]}
+          >
+            <Input.TextArea rows={3} placeholder="请输入项目描述" />
+          </Form.Item>
+          <Form.Item
+            name="members"
+            label="项目成员"
+          >
+            <Select
+              mode="multiple"
+              placeholder="请选择项目成员"
+              options={mockUsers.map(user => ({ value: user.id, label: user.name }))}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" block>
+              保存更改
             </Button>
           </Form.Item>
         </Form>

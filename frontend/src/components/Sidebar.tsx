@@ -67,21 +67,16 @@ function getOpenKeys(pathname: string) {
   return [];
 }
 
-const renderMenuItems = (routes: RouteConfig[]) =>
+const renderMenuItems = (routes: RouteConfig[]): MenuProps['items'] =>
   routes
     .filter(route => !route.meta?.hiddenInSidebar) // 过滤掉隐藏的路由
     .filter(route => hasPermission(route)) // 根据用户角色过滤
-    .map(route =>
-    route.children ? (
-      <Menu.SubMenu key={route.path} icon={route.icon} title={route.label}>
-        {renderMenuItems(route.children)}
-      </Menu.SubMenu>
-    ) : (
-      <Menu.Item key={route.path} icon={route.icon}>
-        <Link to={route.path}>{route.label}</Link>
-      </Menu.Item>
-    )
-  );
+    .map(route => ({
+      key: route.path,
+      icon: route.icon,
+      label: route.children ? route.label : <Link to={route.path}>{route.label}</Link>,
+      children: route.children ? renderMenuItems(route.children) : undefined,
+    }));
 
 const Sidebar: React.FC<SidebarProps> = ({ onMenuClick, collapsed = false, isDark = false }) => {
   const location = useLocation();
@@ -138,9 +133,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onMenuClick, collapsed = false, isDar
           className="border-0"
           inlineCollapsed={collapsed}
           style={{ borderInlineEnd: 'none', boxShadow: 'none', background: 'transparent' }}
-        >
-          {renderMenuItems(routes)}
-        </Menu>
+          items={renderMenuItems(routes)}
+        />
       </nav>
     </aside>
   );

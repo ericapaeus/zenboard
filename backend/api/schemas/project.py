@@ -5,7 +5,6 @@ from datetime import datetime
 class ProjectBase(BaseModel):
     name: str = Field(..., description="项目名称", max_length=100)
     description: Optional[str] = Field(None, description="项目描述")
-    color: str = Field("#1890ff", description="项目颜色")
 
 class ProjectCreate(ProjectBase):
     pass
@@ -13,7 +12,6 @@ class ProjectCreate(ProjectBase):
 class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, description="项目名称", max_length=100)
     description: Optional[str] = Field(None, description="项目描述")
-    color: Optional[str] = Field(None, description="项目颜色")
     status: Optional[str] = Field(None, description="项目状态")
 
 class ProjectResponse(ProjectBase):

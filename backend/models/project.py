@@ -14,9 +14,6 @@ class Project(Base):
     # 项目状态: active(活跃), archived(已归档)
     status = Column(String(20), default="active", nullable=False, comment="项目状态: active(活跃), archived(已归档)")
     
-    # 项目颜色标识
-    color = Column(String(7), default="#1890ff", nullable=False, comment="项目颜色标识（hex）")  # hex color
-    
     # 创建者
     creator_id = Column(Integer, nullable=False, comment="创建者用户ID")
     
