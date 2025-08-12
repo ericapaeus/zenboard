@@ -13,6 +13,7 @@ interface Subtask {
   id: string;
   title: string;
   content: string;
+  assignee?: string; // 新增处理人字段
   parentId?: string;
   children?: Subtask[];
 }
@@ -179,7 +180,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   }, []);
 
   // 状态管理
-  const [activeTab, setActiveTab] = useState(displayMode === 'pendingOnly' ? 'pending' : 'draft');
+  const [activeTab, setActiveTab] = useState('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchForm] = Form.useForm();
@@ -263,7 +264,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
       originalAssignee: '李四',
       startDate: '2024-01-20',
       endDate: '2024-01-22',
-      status: 'draft',
+      status: 'pending',
       progress: 0,
       project: 'ZenBoard 前端优化',
       priority: 'medium',
@@ -408,6 +409,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         id: `s${Date.now()}`,
         title: values.title,
         content: values.content,
+        assignee: values.assignee, // 添加处理人字段
       };
       const updatedTasks = tasks.map(task =>
         task.id === selectedTask.id
@@ -598,11 +600,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
       return getTasksByStatus('pending');
     }
     const statusMap: Record<string, Task['status']> = {
-      'draft': 'draft',
       'pending': 'pending', 
       'completed': 'completed'
     };
-    return getTasksByStatus(statusMap[activeTab] || 'draft');
+    return getTasksByStatus(statusMap[activeTab] || 'pending');
   };
 
   const currentTabTasks = getCurrentTabTasks();
@@ -742,15 +743,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                 onClick={() => handleTransferModalOpen(task)}
               >
                 处理任务
-              </Button>
-            ] : []),
-            ...(displayMode === 'full' && task.status === 'draft' ? [
-              <Button
-                type="link"
-                icon={<SendOutlined />}
-                onClick={() => handleTransferModalOpen(task)}
-              >
-                派发任务
               </Button>,
               <Button
                 type="link"
@@ -760,6 +752,15 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                 编辑
               </Button>
             ] : []),
+            ...(displayMode === 'full' && task.status === 'draft' ? [
+              <Button
+                type="link"
+                icon={<SendOutlined />}
+                onClick={() => handleTransferModalOpen(task)}
+              >
+                派发任务
+              </Button>
+            ] : []),
             ...(displayMode === 'pendingOnly' && task.status === 'pending' ? [
               <Button
                 type="link"
@@ -767,6 +768,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                 onClick={() => handleTransferModalOpen(task)}
               >
                 处理任务
+              </Button>,
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => handleEditModalOpen(task)}
+              >
+                编辑
               </Button>
             ] : [])
           ]}
@@ -895,6 +903,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                         <div className="w-full">
                           <div className="flex justify-between items-start mb-1">
                             <Text strong>{subtask.title}</Text>
+                            {subtask.assignee && <Tag color="blue">{subtask.assignee}</Tag>}
                           </div>
                           <Text type="secondary" className="block">{subtask.content}</Text>
                         </div>
@@ -1058,15 +1067,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               onChange={setActiveTab}
               items={[
                 {
-                  key: 'draft',
-                  label: (
-                    <span>
-                      <EditFilled />
-                      起草任务 ({getTasksByStatus('draft').length})
-                    </span>
-                  ),
-                },
-                {
                   key: 'pending',
                   label: (
                     <span>
@@ -1119,7 +1119,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
       {currentTabTasks.length === 0 && (
         <div className="text-center py-12">
           <div className="text-gray-400 text-lg mb-2">
-            {displayMode === 'pendingOnly' ? '暂无待办任务' : (searchForm.getFieldValue('keyword') || searchForm.getFieldValue('member') ? '没有找到匹配的任务' : `暂无${activeTab === 'draft' ? '起草' : activeTab === 'pending' ? '待办' : '已办'}任务`)}
+            {displayMode === 'pendingOnly' ? '暂无待办任务' : (searchForm.getFieldValue('keyword') || searchForm.getFieldValue('member') ? '没有找到匹配的任务' : `暂无${activeTab === 'pending' ? '待办' : '已办'}任务`)}
           </div>
           <div className="text-gray-400 text-sm">
             {displayMode === 'pendingOnly' ? '请稍后再试或联系管理员' : (searchForm.getFieldValue('keyword') || searchForm.getFieldValue('member') ? '请尝试调整搜索关键词' : '点击右上角按钮添加')}
@@ -1146,14 +1146,14 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             ...(selectedTask.status === 'pending' ? [
               <Button key="transfer" icon={<SendOutlined />} onClick={() => handleTransferModalOpen(selectedTask)}>
                 处理任务
+              </Button>,
+              <Button key="edit" icon={<EditOutlined />} onClick={() => handleEditModalOpen(selectedTask)}>
+                编辑
               </Button>
             ] : []),
             ...(selectedTask.status === 'draft' ? [
               <Button key="transfer" icon={<SendOutlined />} onClick={() => handleTransferModalOpen(selectedTask)}>
                 派发任务
-              </Button>,
-              <Button key="edit" icon={<EditOutlined />} onClick={() => handleEditModalOpen(selectedTask)}>
-                编辑
               </Button>
             ] : []),
             <Popconfirm
@@ -1289,24 +1289,37 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                     onFinish={handleAddSubtask}
                   >
                     <Row gutter={16}>
-                      <Col span={24}>
+                          <Col span={24}>
+                            <Form.Item
+                              name="title"
+                              label="子任务标题"
+                              rules={[{ required: true, message: '请输入子任务标题！' }]}
+                            >
+                              <Input placeholder="请输入子任务标题" />
+                            </Form.Item>
+                          </Col>
+                          <Col span={24}>
+                            <Form.Item
+                              name="assignee"
+                              label="处理人"
+                              rules={[{ required: true, message: '请选择子任务处理人！' }]}
+                            >
+                              <Select placeholder="选择处理人">
+                                {mockUsers.map(user => (
+                                  <Option key={user} value={user}>{user}</Option>
+                                ))}
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        
                         <Form.Item
-                          name="title"
-                          label="子任务标题"
-                          rules={[{ required: true, message: '请输入子任务标题！' }]}
+                          name="content"
+                          label="子任务内容"
+                          rules={[{ required: true, message: '请输入子任务内容！' }]}
                         >
-                          <Input placeholder="请输入子任务标题" />
+                          <TextArea rows={3} placeholder="请输入子任务内容" />
                         </Form.Item>
-                      </Col>
-                    </Row>
-                    
-                    <Form.Item
-                      name="content"
-                      label="子任务内容"
-                      rules={[{ required: true, message: '请输入子任务内容！' }]}
-                    >
-                      <TextArea rows={3} placeholder="请输入子任务内容" />
-                    </Form.Item>
 
                     <div className="flex gap-2">
                       <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>
@@ -1459,29 +1472,43 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                           />
                         </div>
                         
-                        <Row gutter={16}>
-                          <Col span={24}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'title']}
-                              rules={[{ required: true, message: '请输入子任务标题！' }]}
-                            >
-                              <Input placeholder="子任务标题" />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                        
-                        <Row gutter={16}>
-                          <Col span={24}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'content']}
-                              rules={[{ required: true, message: '请输入子任务内容！' }]}
-                            >
-                              <TextArea rows={2} placeholder="子任务内容" />
-                            </Form.Item>
-                          </Col>
-                        </Row>
+                          <Row gutter={16}>
+                            <Col span={24}>
+                              <Form.Item
+                                {...restField}
+                                name={[name, 'title']}
+                                rules={[{ required: true, message: '请输入子任务标题！' }]}
+                              >
+                                <Input placeholder="子任务标题" />
+                              </Form.Item>
+                            </Col>
+                            <Col span={24}>
+                              <Form.Item
+                                {...restField}
+                                name={[name, 'assignee']}
+                                label="处理人"
+                                rules={[{ required: true, message: '请选择子任务处理人！' }]}
+                              >
+                                <Select placeholder="选择处理人">
+                                  {mockUsers.map(user => (
+                                    <Option key={user} value={user}>{user}</Option>
+                                  ))}
+                                </Select>
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                          
+                          <Row gutter={16}>
+                            <Col span={24}>
+                              <Form.Item
+                                {...restField}
+                                name={[name, 'content']}
+                                rules={[{ required: true, message: '请输入子任务内容！' }]}
+                              >
+                                <TextArea rows={2} placeholder="子任务内容" />
+                              </Form.Item>
+                            </Col>
+                          </Row>
                       </div>
                     ))}
                     
@@ -1651,6 +1678,20 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                                 rules={[{ required: true, message: '请输入子任务标题！' }]}
                               >
                                 <Input placeholder="子任务标题" />
+                              </Form.Item>
+                            </Col>
+                            <Col span={24}>
+                              <Form.Item
+                                {...restField}
+                                name={[name, 'assignee']}
+                                label="处理人"
+                                rules={[{ required: true, message: '请选择子任务处理人！' }]}
+                              >
+                                <Select placeholder="选择处理人">
+                                  {mockUsers.map(user => (
+                                    <Option key={user} value={user}>{user}</Option>
+                                  ))}
+                                </Select>
                               </Form.Item>
                             </Col>
                           </Row>
