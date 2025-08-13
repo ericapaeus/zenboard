@@ -3,7 +3,7 @@ import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, messag
 import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, SearchOutlined, CheckCircleFilled, ClockCircleFilled, EditFilled, DownOutlined, RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Task, Subtask, TaskFlow } from '@/types';
-import { useProjects, useAuthUsers, useCreateTask, useTasks, useCreateMessage } from '@/hooks/useApi';
+import { useProjects, useAuthUsers, useCreateTask, useTasks, useCreateMessage, useDeleteTask, useUpdateTask, useCreateComment, useFetchTaskComments } from '@/hooks/useApi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -11,6 +11,22 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 // const { RangePicker } = DatePicker;
+
+// Markdown normalize so titles/lists render correctly even without space
+function normalizeMarkdown(text: string): string {
+  const normalized = (text || '').replace(/\r\n/g, '\n');
+  return normalized
+    .split('\n')
+    .map((line) => {
+      let l = line;
+      l = l.replace(/^(#{1,6})(?!\s|#)/, '$1 ');
+      l = l.replace(/^([*\-+])(?!\s)/, '$1 ');
+      l = l.replace(/^(\d+\.)(?!\s)/, '$1 ');
+      l = l.replace(/^(>)(?!\s)/, '> ');
+      return l;
+    })
+    .join('\n');
+}
 
 interface TaskProps {
   displayMode?: 'full' | 'pendingOnly';
@@ -173,6 +189,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         newSet.delete(taskId);
       } else {
         newSet.add(taskId);
+        // 首次展开时加载评论
+        if (!taskComments[taskId] || taskComments[taskId].length === 0) {
+          loadTaskComments(taskId);
+        }
       }
       return newSet;
     });
@@ -185,32 +205,55 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const { data: apiTasks, loading: tasksLoading, refetch: refetchTasks } = useTasks();
 
-  // 静态评论数据与输入框状态
+  // 静态评论数据与输入框状态 - 替换为API调用
   type TaskComment = { id: number; author_id: number; author_name?: string; author_avatar?: string; content: string; created_at: string };
-  const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({
-    '1': [
-      { id: 1, author_id: 2, author_name: '李四', content: '先把基础数据补齐，我下班前看一版。', created_at: '2025-08-13 10:00:00' },
-      { id: 2, author_id: 3, author_name: '王五', content: 'OK，我下午两点前给到。', created_at: '2025-08-13 10:15:00' },
-    ],
-    '2': [
-      { id: 3, author_id: 4, author_name: '赵六', content: '会议议程我补充了两个点：质量与风险。', created_at: '2025-08-12 09:30:00' },
-    ],
-  });
+  const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
 
-  const addTaskComment = (taskId: string) => {
+  // 添加评论相关的hooks
+  const { createComment, loading: createCommentLoading } = useCreateComment();
+  const { fetchComments: fetchTaskComments, loading: fetchCommentsLoading } = useFetchTaskComments();
+
+  const addTaskComment = async (taskId: string) => {
     const content = (commentInputs[taskId] || '').trim();
     if (!content) { message.error('请输入评论内容'); return; }
-    const nextId = Date.now();
-    const next: TaskComment = { id: nextId, author_id: 0, author_name: '当前用户', content, created_at: new Date().toISOString() };
-    setTaskComments(prev => ({ ...prev, [taskId]: [...(prev[taskId] || []), next] }));
-    setCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+    
+    try {
+      await createComment({
+        content,
+        task_id: Number(taskId)
+      });
+      
+      // 重新加载评论列表
+      try {
+        const comments = await fetchTaskComments(Number(taskId));
+        setTaskComments(prev => ({ ...prev, [taskId]: comments }));
+      } catch (error) {
+        console.error('重新加载评论失败:', error);
+      }
+      
+      setCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+    } catch (error) {
+      console.error('添加评论失败:', error);
+    }
+  };
+
+  // 获取任务评论的函数
+  const loadTaskComments = async (taskId: string) => {
+    try {
+      const comments = await fetchTaskComments(Number(taskId));
+      setTaskComments(prev => ({ ...prev, [taskId]: comments }));
+    } catch (error) {
+      console.error('获取任务评论失败:', error);
+    }
   };
 
   const { data: projectsData } = useProjects();
   const { data: usersData } = useAuthUsers();
   const { createTask } = useCreateTask();
   const { createMessage } = useCreateMessage();
+  const { deleteTask } = useDeleteTask();
+  const { updateTask } = useUpdateTask();
 
   const getUserName = (id?: number | null) => {
     if (!id || !usersData) return '未分配';
@@ -227,19 +270,22 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   const mapApiTaskToUi = (t: any): Task => ({
     id: String(t.id),
     title: t.title,
-    content: t.description || '',
+    content: t.content || '',  // 使用content字段
     currentAssignee: getUserName(t.assignee_id),
     originalAssignee: getUserName(t.original_assignee_id) || getUserName(t.assignee_id),
-    startDate: t.created_at ? new Date(t.created_at).toISOString().slice(0,10) : '',
-    endDate: t.due_date ? new Date(t.due_date).toISOString().slice(0,10) : '',
+    startDate: t.start_date ? new Date(t.start_date).toISOString().slice(0,10) : '',
+    endDate: t.end_date ? new Date(t.end_date).toISOString().slice(0,10) : '',
     progress: typeof t.progress === 'number' ? t.progress : 0,
     project: getProjectName(t.project_id != null ? String(t.project_id) : null),
     priority: (t.priority || 'medium'),
-      subtasks: [],
-      flowHistory: [],
+    subtasks: t.subtasks || [], // 从后端获取子任务数据
+    flowHistory: [],
     completionNotes: t.completion_notes || '',
     createdBy: getUserName(t.creator_id),
     createdAt: t.created_at || new Date().toISOString(),
+    // 添加原始ID字段，用于编辑表单
+    assignee_id: t.assignee_id,
+    project_id: t.project_id ? Number(t.project_id) : undefined, // 确保是数字类型
   });
 
   React.useEffect(() => {
@@ -277,7 +323,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     setSelectedTask(task);
     setIsDetailsModalVisible(true);
     setShowAddSubtaskForm(false);
-    // setCompletionNotes(task.completionNotes || ''); // This line was removed from the new_code, so it's removed here.
+    // 加载任务评论
+    loadTaskComments(task.id);
   };
 
   const handleDetailsModalCancel = () => {
@@ -302,11 +349,24 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     setSelectedTask(task);
     setIsEditModalVisible(true);
     
+    // 处理子任务数据，确保包含 id 字段
+    const processedSubtasks = (task.subtasks || []).map(subtask => ({
+      id: subtask.id,
+      title: subtask.title,
+      content: subtask.content,
+      assignee_id: subtask.assignee_id
+    }));
+    
     // 将字符串日期转换为 dayjs 对象，以便 DatePicker 能正确显示
     const formValues = {
-      ...task,
+      title: task.title,
+      content: task.content,
+      assignee_id: task.assignee_id, // 使用原始的用户ID
+      project_id: task.project_id ? Number(task.project_id) : undefined, // 确保空的 project_id 被正确处理
+      priority: task.priority,
       startDate: task.startDate ? dayjs(task.startDate) : null,
       endDate: task.endDate ? dayjs(task.endDate) : null,
+      subtasks: processedSubtasks,
     };
     
     editForm.setFieldsValue(formValues);
@@ -326,7 +386,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         id: `s${Date.now()}`,
         title: values.title,
         content: values.content,
-        assignee: values.assignee, // 添加处理人字段
+        assignee: getUserName(values.assignee_id), // 显示用户名
+        assignee_id: values.assignee_id, // 存储用户ID
       };
       const updatedTasks = tasks.map(task =>
         task.id === selectedTask.id
@@ -356,15 +417,24 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
   const handleCreateTask = async (values: any) => {
     try {
-      const created = await createTask({
+      // 处理创建任务的数据
+      const createData: any = {
         title: values.title,
-        description: values.content,
+        content: values.content,
         priority: values.priority,
         assignee_id: values.assignee_id,
-        project_id: values.project_id,
         parent_task_id: undefined,
-        due_date: values.endDate ? values.endDate.format('YYYY-MM-DD') : undefined,
-      });
+        start_date: values.startDate ? values.startDate.format('YYYY-MM-DD') : undefined,
+        end_date: values.endDate ? values.endDate.format('YYYY-MM-DD') : undefined,
+        subtasks: values.subtasks || [],
+      };
+      
+      // 只有当 project_id 有值时才传递
+      if (values.project_id !== undefined && values.project_id !== null && values.project_id !== '') {
+        createData.project_id = values.project_id;
+      }
+      
+      const created = await createTask(createData);
       
       message.success('任务创建成功！');
       handleCreateModalCancel();
@@ -377,28 +447,66 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
   const handleEditTask = async (values: any) => {
     if (selectedTask) {
-      // 处理日期格式
-      const processedValues = {
-        ...values,
-        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : values.startDate,
-        endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : values.endDate,
-      };
-      
-      const updatedTasks = tasks.map(task =>
-        task.id === selectedTask.id
-          ? { ...task, ...processedValues }
-          : task
-      );
-      setTasks(updatedTasks);
-      message.success('任务更新成功！');
-      handleEditModalCancel();
+      try {
+        // 处理子任务数据，确保包含所有必要字段
+        const processedSubtasks = (values.subtasks || []).map((subtask: any, index: number) => {
+          // 如果是现有子任务，保留原始ID和创建时间
+          const existingSubtask = selectedTask.subtasks.find(s => s.title === subtask.title);
+          return {
+            id: existingSubtask?.id || `temp_${Date.now()}_${index}`,
+            title: subtask.title,
+            content: subtask.content || '',
+            assignee_id: subtask.assignee_id,
+            created_at: existingSubtask?.created_at || new Date().toISOString()
+          };
+        });
+
+        // 处理日期格式
+        const processedValues: any = {
+          title: values.title,
+          content: values.content, // 直接使用 content 字段
+          priority: values.priority,
+          assignee_id: values.assignee_id,
+          start_date: values.startDate ? values.startDate.format('YYYY-MM-DD') : values.startDate,
+          end_date: values.endDate ? values.endDate.format('YYYY-MM-DD') : values.endDate,
+          subtasks: processedSubtasks,
+        };
+        
+        // 只有当 project_id 有值时才传递
+        if (values.project_id !== undefined && values.project_id !== null && values.project_id !== '') {
+          processedValues.project_id = values.project_id;
+        }
+        
+        console.log('发送到后端的子任务数据:', processedSubtasks);
+        console.log('发送到后端的完整数据:', processedValues);
+        
+        // 调用后端API更新任务
+        await updateTask(Number(selectedTask.id), processedValues);
+        
+        // 刷新任务列表
+        refetchTasks();
+        
+        // 关闭编辑模态框
+        handleEditModalCancel();
+        
+        // 显示成功消息
+        message.success('任务更新成功！');
+      } catch (error) {
+        console.error('更新任务失败:', error);
+        // 错误消息已在hook中处理
+      }
     }
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
-    message.success('任务删除成功！');
-    handleDetailsModalCancel();
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteTask(Number(taskId));
+      message.success('任务删除成功！');
+      handleDetailsModalCancel();
+      refetchTasks();
+    } catch (e) {
+      // 已在 hook 内提示
+    }
   };
 
   // 搜索和筛选功能
@@ -435,7 +543,9 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   };
 
   // 根据当前标签页过滤任务
-  const getTasksByStatus = (_status: Task['status']) => tasks;
+  const getTasksByStatus = (_status: any) => {
+    return tasks;
+  };
 
   // 初始化筛选结果
   React.useEffect(() => {
@@ -470,7 +580,22 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             onClick={() => handleEditModalOpen(task)}
             >
             编辑
-            </Button>
+            </Button>,
+            <Popconfirm
+              key="delete"
+              title="确定要删除此任务吗？"
+              onConfirm={() => handleDeleteTask(task.id)}
+              okText="是"
+              cancelText="否"
+            >
+              <Button
+                type="link"
+                danger
+                icon={<DeleteOutlined />}
+              >
+                删除
+              </Button>
+            </Popconfirm>
         ]}
       >
         <div className="mb-4">
@@ -548,7 +673,22 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                 onClick={() => handleEditModalOpen(task)}
               >
                 编辑
-              </Button>
+              </Button>,
+              <Popconfirm
+                key="delete"
+                title="确定要删除此任务吗？"
+                onConfirm={() => handleDeleteTask(task.id)}
+                okText="是"
+                cancelText="否"
+              >
+                <Button
+                  type="link"
+                  danger
+                  icon={<DeleteOutlined />}
+                >
+                  删除
+                </Button>
+              </Popconfirm>
           ]}
         >
           {/* 任务基本信息 */}
@@ -648,7 +788,11 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                         <div className="w-full">
                           <div className="flex justify-between items-start mb-1">
                             <Text strong>{subtask.title}</Text>
-                            {subtask.assignee && <Tag color="blue">{subtask.assignee}</Tag>}
+                            {(subtask.assignee || (subtask.assignee_id && getUserName(subtask.assignee_id))) && (
+                              <Tag color="blue">
+                                {subtask.assignee || getUserName(subtask.assignee_id)}
+                              </Tag>
+                            )}
                           </div>
                           <Text type="secondary" className="block">{subtask.content}</Text>
                         </div>
@@ -665,6 +809,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                     bordered
                   dataSource={taskComments[task.id] || []}
                   locale={{ emptyText: '暂无评论' }}
+                  loading={fetchCommentsLoading}
                   renderItem={(c: any) => (
                       <List.Item>
                       <List.Item.Meta
@@ -673,7 +818,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                         description={
                           <div>
                             <div style={{ background: '#fff' }}>
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.content}</ReactMarkdown>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMarkdown(c.content)}</ReactMarkdown>
                             </div>
                             <Text type="secondary" className="text-xs">{formatDateTime(c.created_at)}</Text>
                             </div>
@@ -690,7 +835,14 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                     onChange={(e) => setCommentInputs(prev => ({ ...prev, [task.id]: e.target.value }))}
                   />
                   <div style={{ textAlign: 'right', marginTop: 8 }}>
-                    <Button type="primary" size="small" onClick={() => addTaskComment(task.id)}>添加评论</Button>
+                    <Button 
+                      type="primary" 
+                      size="small" 
+                      loading={createCommentLoading}
+                      onClick={() => addTaskComment(task.id)}
+                    >
+                      添加评论
+                    </Button>
                   </div>
               </div>
               </div>
@@ -854,6 +1006,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                   size="small"
               dataSource={taskComments[selectedTask.id] || []}
               locale={{ emptyText: '暂无评论' }}
+              loading={fetchCommentsLoading}
               renderItem={(c: any) => (
                     <List.Item>
                   <List.Item.Meta
@@ -861,7 +1014,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                     title={<Text strong>{c.author_name || `用户${c.author_id}`}</Text>}
                     description={
                       <div>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.content}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMarkdown(c.content)}</ReactMarkdown>
                         <Text type="secondary" className="text-xs">{formatDateTime(c.created_at)}</Text>
                         </div>
                     }
@@ -877,7 +1030,14 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                 onChange={(e) => setCommentInputs(prev => ({ ...prev, [selectedTask.id]: e.target.value }))}
               />
               <div style={{ textAlign: 'right', marginTop: 8 }}>
-                <Button type="primary" size="small" onClick={() => addTaskComment(selectedTask.id)}>添加评论</Button>
+                <Button 
+                  type="primary" 
+                  size="small" 
+                  loading={createCommentLoading}
+                  onClick={() => addTaskComment(selectedTask.id)}
+                >
+                  添加评论
+                </Button>
               </div>
             </div>
 
@@ -917,6 +1077,11 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                       <div className="w-full">
                         <div className="flex justify-between items-start mb-1">
                           <Text strong>{subtask.title}</Text>
+                          {(subtask.assignee || (subtask.assignee_id && getUserName(subtask.assignee_id))) && (
+                            <Tag color="blue">
+                              {subtask.assignee || getUserName(subtask.assignee_id)}
+                            </Tag>
+                          )}
                         </div>
                         <Text type="secondary" className="block mb-1">{subtask.content}</Text>
                       </div>
@@ -949,13 +1114,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                           </Col>
                           <Col span={24}>
                             <Form.Item
-                              name="assignee"
+                              name="assignee_id"
                               label="处理人"
                               rules={[{ required: true, message: '请选择子任务处理人！' }]}
                             >
                               <Select placeholder="选择处理人">
-                                {mockUsers.map(user => (
-                                  <Option key={user} value={user}>{user}</Option>
+                                {(usersData || []).map(user => (
+                                  <Option key={user.id} value={user.id}>{user.name || `用户${user.id}`}</Option>
                                 ))}
                               </Select>
                             </Form.Item>
@@ -1078,7 +1243,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             name="project_id"
             label="所属项目"
           >
-            <Select placeholder="选择所属项目（可选）">
+            <Select 
+              placeholder="选择所属项目（可选）" 
+              allowClear
+              showSearch
+              optionFilterProp="children"
+              style={{ width: '100%' }}
+            >
               {(projectsData || []).map(project => (
                 <Option key={project.id} value={Number(project.id)}>{project.name}</Option>
               ))}
@@ -1097,7 +1268,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                   onClick={() => {
                     const currentSubtasks = createForm.getFieldValue('subtasks') || [];
                     createForm.setFieldsValue({
-                      subtasks: [...currentSubtasks, { id: `temp_${Date.now()}`, title: '', content: '' }]
+                      subtasks: [...currentSubtasks, { id: `temp_${Date.now()}`, title: '', content: '', assignee_id: null }]
                     });
                   }}
                 >
@@ -1134,13 +1305,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                             <Col span={24}>
                               <Form.Item
                                 {...restField}
-                                name={[name, 'assignee']}
+                                name={[name, 'assignee_id']}
                                 label="处理人"
                                 rules={[{ required: true, message: '请选择子任务处理人！' }]}
                               >
                                 <Select placeholder="选择处理人">
                                 {(usersData || []).map(user => (
-                                  <Option key={user.id} value={user.name || `用户${user.id}`}>{user.name || `用户${user.id}`}</Option>
+                                  <Option key={user.id} value={user.id}>{user.name || `用户${user.id}`}</Option>
                                   ))}
                                 </Select>
                               </Form.Item>
@@ -1206,13 +1377,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
-                  name="currentAssignee"
+                  name="assignee_id"
                   label="任务负责人"
                   rules={[{ required: true, message: '请选择任务负责人！' }]}
                 >
                   <Select placeholder="选择任务负责人">
-                    {mockUsers.map(user => (
-                      <Option key={user} value={user}>{user}</Option>
+                    {(usersData || []).map(user => (
+                      <Option key={user.id} value={user.id}>{user.name || `用户${user.id}`}</Option>
                     ))}
                   </Select>
                 </Form.Item>
@@ -1264,12 +1435,18 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             </Row>
 
             <Form.Item
-              name="project"
+              name="project_id"
               label="所属项目"
             >
-              <Select placeholder="选择所属项目（可选）">
+              <Select 
+                placeholder="选择所属项目（可选）" 
+                allowClear
+                showSearch
+                optionFilterProp="children"
+                style={{ width: '100%' }}
+              >
                 {(projectsData || []).map(project => (
-                  <Option key={project.id} value={project.name}>{project.name}</Option>
+                  <Option key={project.id} value={Number(project.id)}>{project.name}</Option>
                 ))}
               </Select>
             </Form.Item>
@@ -1286,7 +1463,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                     onClick={() => {
                       const currentSubtasks = editForm.getFieldValue('subtasks') || [];
                       editForm.setFieldsValue({
-                        subtasks: [...currentSubtasks, { id: `temp_${Date.now()}`, title: '', content: '' }]
+                        subtasks: [...currentSubtasks, { id: `temp_${Date.now()}`, title: '', content: '', assignee_id: null }]
                       });
                     }}
                   >
@@ -1312,6 +1489,15 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                             </Button>
                           </div>
                           
+                          {/* 隐藏的 id 字段 */}
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'id']}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                          
                           <Row gutter={16}>
                             <Col span={24}>
                               <Form.Item
@@ -1325,13 +1511,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                             <Col span={24}>
                               <Form.Item
                                 {...restField}
-                                name={[name, 'assignee']}
+                                name={[name, 'assignee_id']}
                                 label="处理人"
                                 rules={[{ required: true, message: '请选择子任务处理人！' }]}
                               >
                                 <Select placeholder="选择处理人">
-                                  {mockUsers.map(user => (
-                                    <Option key={user} value={user}>{user}</Option>
+                                  {(usersData || []).map(user => (
+                                    <Option key={user.id} value={user.id}>{user.name || `用户${user.id}`}</Option>
                                   ))}
                                 </Select>
                               </Form.Item>
@@ -1358,7 +1544,11 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             </Form.Item>
 
             <Form.Item>
-              <Button type="primary" htmlType="submit" block>
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                block
+              >
                 保存更改
               </Button>
             </Form.Item>

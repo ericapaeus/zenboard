@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm, Space } from 'antd';
-import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
+import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ClockCircleFilled, CheckCircleFilled } from '@ant-design/icons';
 import { useParams } from 'react-router-dom'; // Import useParams
 
 const { Title, Text, Paragraph } = Typography;
@@ -158,14 +158,12 @@ const ProjectTasks: React.FC = () => {
     message.success(`成员 ${memberToDelete} 已删除！`);
   };
 
-  const getStatusTag = (status: Task['status']) => {
+  const getStatusTag = (status: any) => {
     switch (status) {
-      case 'todo':
-        return <Tag color="blue">待办</Tag>;
-      case 'in-progress':
-        return <Tag color="processing">进行中</Tag>;
-      case 'done':
-        return <Tag color="success">已完成</Tag>;
+      case 'pending':
+        return <Tag color="processing" icon={<ClockCircleFilled />}>待处理</Tag>;
+      case 'completed':
+        return <Tag color="success" icon={<CheckCircleFilled />}>已完成</Tag>;
       default:
         return <Tag>未知</Tag>;
     }
@@ -320,7 +318,6 @@ const ProjectTasks: React.FC = () => {
           <Card
             key={task.id}
             title={task.title}
-            extra={getStatusTag(task.status)}
             hoverable
             className="shadow-md"
           >

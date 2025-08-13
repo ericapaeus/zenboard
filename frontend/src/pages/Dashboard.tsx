@@ -175,18 +175,6 @@ export default function Dashboard() {
   const mockUsers = ['张三', '李四', '王五', '赵六', '孙七'];
   const mockProjects = ['ZenBoard 后端开发', 'ZenBoard 前端优化', 'ZenBoard 数据库优化', 'ZenBoard UI/UX 设计'];
 
-  // 获取状态标签
-  const getStatusTag = (status: Task['status']) => {
-    switch (status) {
-      case 'pending':
-        return <Tag color="processing" icon={<ClockCircleFilled />}>待处理</Tag>;
-      case 'completed':
-        return <Tag color="success" icon={<CheckCircleFilled />}>已完成</Tag>;
-      default:
-        return <Tag>未知</Tag>;
-    }
-  };
-
   // 获取优先级标签
   const getPriorityTag = (priority: Task['priority']) => {
     switch (priority) {
@@ -211,18 +199,15 @@ export default function Dashboard() {
     return new Date(dateString).toLocaleString('zh-CN');
   };
 
-  // 根据状态过滤任务
-  const getTasksByStatus = (status: Task['status']) => {
-    return tasks.filter(task => task.status === status);
+  // 根据状态过滤任务 - 移除状态过滤，返回所有任务
+  const getTasksByStatus = (status: any) => {
+    return tasks; // 返回所有任务，不再按状态过滤
   };
 
   // 获取当前标签页任务
   const getCurrentTabTasks = () => {
-    const statusMap: Record<string, Task['status']> = {
-      'pending': 'pending', 
-      'completed': 'completed'
-    };
-    return getTasksByStatus(statusMap[activeTab] || 'pending');
+    // 移除状态过滤，返回所有任务
+    return tasks;
   };
 
   const currentTabTasks = getCurrentTabTasks();
@@ -240,7 +225,6 @@ export default function Dashboard() {
       currentAssignee: values.assignee,
       startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : '',
       endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : '',
-      status: 'pending',
       progress: 0,
       project: values.project,
       priority: values.priority,
@@ -443,7 +427,6 @@ export default function Dashboard() {
             </div>
             <Space>
               {getPriorityTag(task.priority)}
-              {getStatusTag(task.status)}
             </Space>
           </div>
           
@@ -488,7 +471,7 @@ export default function Dashboard() {
                 <Progress 
                   percent={task.progress} 
                   size="small"
-                  strokeColor={task.status === 'completed' ? '#52c41a' : '#1890ff'}
+                  strokeColor="#1890ff"
                 />
               </div>
             </Col>
@@ -639,24 +622,20 @@ export default function Dashboard() {
         {/* 操作按钮 - 放在任务卡片底部 */}
         <div className="mt-4 pt-3 border-t border-gray-100">
           <Space>
-            {task.status === 'pending' && (
-              <Button
-                type="link"
-                icon={<SendOutlined />}
-                onClick={() => message.info('处理任务功能')}
-              >
-                处理任务
-              </Button>
-            )}
-            {task.status === 'pending' && (
-              <Button
-                type="link"
-                icon={<EditOutlined />}
-                onClick={() => handleEditModalOpen(task)}
-              >
-                编辑
-              </Button>
-            )}
+            <Button
+              type="link"
+              icon={<SendOutlined />}
+              onClick={() => message.info('处理任务功能')}
+            >
+              处理任务
+            </Button>
+            <Button
+              type="link"
+              icon={<EditOutlined />}
+              onClick={() => handleEditModalOpen(task)}
+            >
+              编辑
+            </Button>
           </Space>
         </div>
       </Card>

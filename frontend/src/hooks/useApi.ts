@@ -1,16 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { message, Modal } from 'antd';
-import { authApi, userApi, teamApi, projectApi, taskApi, diaryApi, messageApi, uploadApi, documentApi, documentCommentApi, wechatAuthApi } from '@/services/api';
+import { authApi, userApi, teamApi, projectApi, taskApi, messageApi, uploadApi, documentApi, documentCommentApi, wechatAuthApi } from '@/services/api';
 import type { ApiResponse } from '@/utils/api';
 import type { 
   User, 
   Project, 
   Task, 
-  Diary, 
   Contract, 
-  Message, 
   Document, 
   DocumentComment,
+  Message,
   CreateDocumentData,
   UpdateDocumentData,
   AddCommentData,
@@ -22,6 +21,26 @@ import type {
   CreateProjectData,
   UpdateProjectData
 } from '@/types';
+
+// 添加评论相关的类型定义
+export interface Comment {
+  id: number;
+  content: string;
+  author_id: number;
+  author_name?: string;
+  task_id?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCommentData {
+  content: string;
+  task_id?: number;
+}
+
+export interface UpdateCommentData {
+  content: string;
+}
 
 // ==================== 通用 API Hook ====================
 
@@ -413,30 +432,6 @@ export const useSubTasks = (taskId: string) => {
   );
 };
 
-// ==================== 日记系统 Hooks ====================
-
-export const useMyDiaries = (params?: {
-  page?: number;
-  limit?: number;
-  visibility?: string;
-}) => {
-  return useApi(
-    () => diaryApi.getMyDiaries(params),
-    [params?.page, params?.limit, params?.visibility]
-  );
-};
-
-export const useSharedDiaries = () => {
-  return useApi(() => diaryApi.getSharedDiaries());
-};
-
-export const useDiary = (id: string) => {
-  return useApi(
-    () => diaryApi.getDiary(id),
-    [id]
-  );
-};
-
 // ==================== 消息中心 Hooks ====================
 
 export const useMessages = (params?: {
@@ -613,12 +608,14 @@ export const useCreateTask = () => {
 
   const createTask = async (taskData: {
     title: string;
-    description: string;
+    content: string;
     priority: 'low' | 'medium' | 'high';
     assignee_id?: number;
     project_id?: number;
     parent_task_id?: number;
-    due_date?: string;
+    start_date?: string;
+    end_date?: string;
+    subtasks?: any[];
   }) => {
     setLoading(true);
     try {
@@ -641,35 +638,63 @@ export const useCreateTask = () => {
   return { createTask, loading };
 };
 
-export const useCreateDiary = () => {
+export const useDeleteTask = () => {
   const [loading, setLoading] = useState(false);
 
-  const createDiary = async (diaryData: {
-    title: string;
-    content: string;
-    visibility: 'public' | 'project' | 'private' | 'members';
-    shared_with?: string[];
-    project_id?: string;
-  }) => {
+  const deleteTask = async (taskId: number) => {
     setLoading(true);
     try {
-      const response = await diaryApi.createDiary(diaryData);
+      const response = await taskApi.deleteTask(taskId);
       if (response.success) {
-        message.success('日记创建成功');
+        message.success('任务删除成功');
         return response.data;
       } else {
-        message.error(response.message || '创建失败');
+        message.error(response.message || '删除失败');
         throw new Error(response.message);
       }
     } catch (error) {
-      message.error('创建日记失败');
+      message.error('删除任务失败');
       throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  return { createDiary, loading };
+  return { deleteTask, loading };
+};
+
+export const useUpdateTask = () => {
+  const [loading, setLoading] = useState(false);
+
+  const updateTask = async (taskId: number, taskData: Partial<{
+    title: string;
+    content: string;
+    priority: 'low' | 'medium' | 'high';
+    assignee_id?: number;
+    project_id?: number;
+    start_date?: string;
+    end_date?: string;
+    subtasks?: any[];
+  }>) => {
+    setLoading(true);
+    try {
+      const response = await taskApi.updateTask(taskId, taskData);
+      if (response.success) {
+        message.success('任务更新成功');
+        return response.data;
+      } else {
+        message.error(response.message || '更新失败');
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      message.error('更新任务失败');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { updateTask, loading };
 };
 
 // ==================== 文件上传 Hooks ====================
@@ -993,6 +1018,119 @@ export const useFetchDocumentComments = () => {
 
   return { fetchComments, loading };
 }; 
+
+// ==================== 评论管理 Hooks ====================
+
+// 获取任务评论列表
+export const useTaskComments = (taskId: number) => {
+  return useApi(
+    () => taskApi.getTaskComments(taskId),
+    [taskId]
+  );
+};
+
+// 创建评论
+export const useCreateComment = () => {
+  const [loading, setLoading] = useState(false);
+
+  const createComment = async (data: CreateCommentData): Promise<Comment | null> => {
+    setLoading(true);
+    try {
+      const response = await taskApi.createComment(data);
+      if (response.success) {
+        message.success('评论创建成功');
+        return response.data;
+      } else {
+        message.error(response.message || '创建评论失败');
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      message.error('创建评论失败');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { createComment, loading };
+};
+
+// 更新评论
+export const useUpdateComment = () => {
+  const [loading, setLoading] = useState(false);
+
+  const updateComment = async (commentId: number, data: UpdateCommentData): Promise<Comment | null> => {
+    setLoading(true);
+    try {
+      const response = await taskApi.updateComment(commentId, data);
+      if (response.success) {
+        message.success('评论更新成功');
+        return response.data;
+      } else {
+        message.error(response.message || '更新评论失败');
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      message.error('更新评论失败');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { updateComment, loading };
+};
+
+// 删除评论
+export const useDeleteComment = () => {
+  const [loading, setLoading] = useState(false);
+
+  const deleteComment = async (commentId: number): Promise<boolean> => {
+    setLoading(true);
+    try {
+      const response = await taskApi.deleteComment(commentId);
+      if (response.success) {
+        message.success('评论删除成功');
+        return true;
+      } else {
+        message.error(response.message || '删除评论失败');
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      message.error('删除评论失败');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { deleteComment, loading };
+};
+
+// 获取单个任务评论的 hook
+export const useFetchTaskComments = () => {
+  const [loading, setLoading] = useState(false);
+
+  const fetchComments = async (taskId: number) => {
+    setLoading(true);
+    try {
+      const response = await taskApi.getTaskComments(taskId);
+      if (response.success) {
+        return response.data || [];
+      } else {
+        message.error(response.message || '获取评论失败');
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      message.error('获取评论失败');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { fetchComments, loading };
+};
 
 // ==================== 登录相关 Hooks ====================
 

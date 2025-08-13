@@ -4,7 +4,9 @@ from typing import List, Optional
 from database.database import get_db
 from api.schemas.response import ApiResponse
 from api.schemas.task import TaskCreate, TaskUpdate, TaskResponse, TaskWithSubtasks
+from api.schemas.comment import CommentResponse
 from services.task_service import TaskService
+from services.comment_service import CommentService
 from models.user import User
 from api.dependencies import get_current_user
 import logging
@@ -142,4 +144,33 @@ async def delete_task(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="删除任务失败"
+        )
+
+@router.get("/{task_id}/comments", response_model=ApiResponse[List[CommentResponse]], summary="获取任务评论")
+async def get_task_comments(
+    task_id: int,
+    skip: int = Query(0, ge=0, description="跳过记录数"),
+    limit: int = Query(20, ge=1, le=100, description="返回记录数"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    获取指定任务的评论列表
+    """
+    try:
+        comment_service = CommentService(db)
+        comments = await comment_service.get_comments(
+            current_user.id, skip, limit, task_id=task_id
+        )
+        return ApiResponse(
+            code=200,
+            message="获取任务评论成功",
+            data=comments,
+            success=True
+        )
+    except Exception as e:
+        logger.error(f"获取任务评论失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="获取任务评论失败"
         ) 

@@ -42,7 +42,6 @@ async def get_comments(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(20, ge=1, le=100, description="返回记录数"),
     task_id: Optional[int] = Query(None, description="任务ID过滤"),
-    diary_entry_id: Optional[int] = Query(None, description="日记ID过滤"),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
@@ -52,7 +51,7 @@ async def get_comments(
     try:
         comment_service = CommentService(db)
         comments = await comment_service.get_comments(
-            current_user.id, skip, limit, task_id, diary_entry_id
+            current_user.id, skip, limit, task_id
         )
         return ApiResponse(
             code=200,

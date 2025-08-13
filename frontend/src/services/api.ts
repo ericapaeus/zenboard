@@ -4,13 +4,23 @@ import type {
   User, 
   Project, 
   Task, 
-  Diary, 
   Contract, 
   Document, 
   DocumentComment,
   CreateProjectData,
   UpdateProjectData
 } from '@/types';
+
+// 添加评论类型定义
+export interface Comment {
+  id: number;
+  content: string;
+  author_id: number;
+  author_name?: string;
+  task_id?: number;
+  created_at: string;
+  updated_at: string;
+}
 
 // 认证相关 API
 export const authApi = {
@@ -279,18 +289,20 @@ export const taskApi = {
   // 创建任务（对接后端 /api/task）
   createTask: (taskData: {
     title: string;
-    description: string;
+    content: string;
     priority: 'low' | 'medium' | 'high';
     assignee_id?: number;
     project_id?: number;
     parent_task_id?: number;
-    due_date?: string;
+    start_date?: string;
+    end_date?: string;
+    subtasks?: any[];
   }): Promise<ApiResponse<Task>> => {
     return api.post('/api/task', taskData);
   },
 
   // 更新任务
-  updateTask: (id: number, taskData: Partial<{ title: string; description: string; priority: 'low' | 'medium' | 'high'; assignee_id?: number; project_id?: number; parent_task_id?: number; status?: 'pending' | 'completed'; due_date?: string; }>): Promise<ApiResponse<Task>> => {
+  updateTask: (id: number, taskData: Partial<{ title: string; content: string; priority: 'low' | 'medium' | 'high'; assignee_id?: number; project_id?: number; parent_task_id?: number; status?: 'pending' | 'completed'; start_date?: string; end_date?: string; subtasks?: any[]; }>): Promise<ApiResponse<Task>> => {
     return api.put(`/api/task/${id}`, taskData);
   },
 
@@ -308,68 +320,29 @@ export const taskApi = {
   getSubTasks: (taskId: string): Promise<ApiResponse<Task[]>> => {
     return api.get(`/api/task/${taskId}/subtasks`);
   },
-};
 
-// 日记系统 API
-export const diaryApi = {
-  // 获取我的日记
-  getMyDiaries: (params?: {
-    page?: number;
-    limit?: number;
-    visibility?: string;
-  }): Promise<ApiResponse<{
-    diaries: Diary[];
-    total: number;
-    page: number;
-    limit: number;
-  }>> => {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-    if (params?.visibility) searchParams.append('visibility', params.visibility);
-
-    const query = searchParams.toString();
-    return api.get(`/api/diary/my${query ? `?${query}` : ''}`);
+  // 获取任务评论
+  getTaskComments: (taskId: number, params?: { skip?: number; limit?: number }): Promise<ApiResponse<Comment[]>> => {
+    const sp = new URLSearchParams();
+    if (params?.skip !== undefined) sp.append('skip', String(params.skip));
+    if (params?.limit !== undefined) sp.append('limit', String(params.limit));
+    const q = sp.toString();
+    return api.get(`/api/task/${taskId}/comments${q ? `?${q}` : ''}`);
   },
 
-  // 获取共享日记
-  getSharedDiaries: (): Promise<ApiResponse<Diary[]>> => {
-    return api.get('/api/diary/shared');
+  // 创建评论
+  createComment: (data: { content: string; task_id?: number }): Promise<ApiResponse<Comment>> => {
+    return api.post('/api/comment/', data);
   },
 
-  // 获取单个日记
-  getDiary: (id: string): Promise<ApiResponse<Diary>> => {
-    return api.get(`/api/diary/${id}`);
+  // 更新评论
+  updateComment: (commentId: number, data: { content: string }): Promise<ApiResponse<Comment>> => {
+    return api.put(`/api/comment/${commentId}`, data);
   },
 
-  // 创建日记
-  createDiary: (diaryData: {
-    title: string;
-    content: string;
-    visibility: 'public' | 'project' | 'private' | 'members';
-    shared_with?: string[];
-    project_id?: string;
-  }): Promise<ApiResponse<Diary>> => {
-    return api.post('/api/diary', diaryData);
-  },
-
-  // 更新日记
-  updateDiary: (id: string, diaryData: Partial<Diary>): Promise<ApiResponse<Diary>> => {
-    return api.put(`/api/diary/${id}`, diaryData);
-  },
-
-  // 删除日记
-  deleteDiary: (id: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/api/diary/${id}`);
-  },
-
-  // 分享日记
-  shareDiary: (id: string, shareData: {
-    visibility: 'public' | 'project' | 'members';
-    shared_with?: string[];
-    project_id?: string;
-  }): Promise<ApiResponse<Diary>> => {
-    return api.post(`/api/diary/${id}/share`, shareData);
+  // 删除评论
+  deleteComment: (commentId: number): Promise<ApiResponse<null>> => {
+    return api.delete(`/api/comment/${commentId}`);
   },
 };
 

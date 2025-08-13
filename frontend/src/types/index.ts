@@ -62,9 +62,11 @@ export interface Subtask {
   id: string;
   title: string;
   content: string;
-  assignee?: string;
+  assignee?: string;  // 显示用的用户名
+  assignee_id?: number;  // 存储用的用户ID
   parentId?: string;
   children?: Subtask[];
+  created_at?: string;  // 创建时间
 }
 
 export interface TaskFlow {
@@ -84,7 +86,6 @@ export interface Task {
   originalAssignee: string;
   startDate: string;
   endDate: string;
-  status: 'pending' | 'completed';
   progress: number;
   project?: string;
   priority: 'low' | 'medium' | 'high';
@@ -93,6 +94,9 @@ export interface Task {
   flowHistory: TaskFlow[];
   createdBy: string;
   createdAt: string;
+  // 添加原始ID字段，用于编辑表单
+  assignee_id?: number;
+  project_id?: number;
 }
 
 // 任务操作相关类型

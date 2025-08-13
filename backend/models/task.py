@@ -33,8 +33,6 @@ class Task(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
     start_date = Column(DateTime, nullable=True, comment="开始时间")
     end_date = Column(DateTime, nullable=True, comment="结束时间")
-    due_date = Column(DateTime, nullable=True, comment="截止日期")
-    completed_at = Column(DateTime, nullable=True, comment="完成时间")
     
     # 关系
     project = relationship("Project", back_populates="tasks")
