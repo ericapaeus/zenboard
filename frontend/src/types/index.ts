@@ -27,19 +27,112 @@ export interface Project {
   updated_at: string;
 }
 
+// 扩展项目类型以包含成员信息
+export interface ProjectWithMembers extends Project {
+  user_ids?: number[];
+  task_count?: number;
+  completed_task_count?: number;
+}
+
+// 项目操作相关类型
+export interface CreateProjectData {
+  name: string;
+  description: string;
+  user_ids?: number[];
+}
+
+export interface UpdateProjectData {
+  name?: string;
+  description?: string;
+  user_ids?: number[];
+  status?: 'active' | 'archived';
+}
+
+// 项目查询参数
+export interface ProjectQueryParams {
+  page?: number;
+  limit?: number;
+  status?: 'active' | 'archived';
+  keyword?: string;
+  member_id?: number;
+}
+
 // 任务相关类型
+export interface Subtask {
+  id: string;
+  title: string;
+  content: string;
+  assignee?: string;
+  parentId?: string;
+  children?: Subtask[];
+}
+
+export interface TaskFlow {
+  id: string;
+  fromUser: string;
+  toUser: string;
+  action: 'transfer' | 'complete';
+  notes: string;
+  timestamp: string;
+}
+
 export interface Task {
   id: string;
   title: string;
-  description: string;
-  status: 'todo' | 'in_progress' | 'completed';
+  content: string;
+  currentAssignee: string;
+  originalAssignee: string;
+  startDate: string;
+  endDate: string;
+  status: 'pending' | 'completed';
+  progress: number;
+  project?: string;
   priority: 'low' | 'medium' | 'high';
-  assigned_to?: string;
-  project_id?: string;
-  parent_task_id?: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
+  subtasks: Subtask[];
+  completionNotes?: string;
+  flowHistory: TaskFlow[];
+  createdBy: string;
+  createdAt: string;
+}
+
+// 任务操作相关类型
+export interface CreateTaskData {
+  title: string;
+  content: string;
+  currentAssignee: string;
+  startDate: string;
+  endDate: string;
+  project?: string;
+  priority: 'low' | 'medium' | 'high';
+  subtasks?: Subtask[];
+}
+
+export interface UpdateTaskData {
+  title?: string;
+  content?: string;
+  currentAssignee?: string;
+  startDate?: string;
+  endDate?: string;
+  project?: string;
+  priority?: 'low' | 'medium' | 'high';
+  subtasks?: Subtask[];
+}
+
+export interface TransferTaskData {
+  toUser: string;
+  notes: string;
+  action: 'transfer' | 'complete';
+}
+
+// 任务查询参数
+export interface TaskQueryParams {
+  page?: number;
+  limit?: number;
+  status?: 'pending' | 'completed';
+  priority?: 'low' | 'medium' | 'high';
+  assignee?: string;
+  project?: string;
+  keyword?: string;
 }
 
 // 日记相关类型
@@ -195,4 +288,4 @@ export interface UseApiState<T> {
 export interface UseApiReturn<T> extends UseApiState<T> {
   refetch: () => void;
   setData: (data: T) => void;
-} 
+}

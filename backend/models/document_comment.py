@@ -16,7 +16,7 @@ class DocumentComment(Base):
 
     # 关系
     document = relationship("Document", back_populates="comments")
-    author = relationship("User")
+    author = relationship("User", back_populates="document_comments")
 
     def __repr__(self) -> str:
         return f"<DocumentComment(id={self.id}, document_id={self.document_id}, author_id={self.author_id})>" 

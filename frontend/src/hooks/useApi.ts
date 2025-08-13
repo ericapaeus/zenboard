@@ -18,7 +18,9 @@ import type {
   UploadResponse,
   UseApiState,
   UseApiReturn,
-  MessageCreateData
+  MessageCreateData,
+  CreateProjectData,
+  UpdateProjectData
 } from '@/types';
 
 // ==================== 通用 API Hook ====================
@@ -376,6 +378,15 @@ export const useTeamBoard = () => {
 
 // ==================== 任务管理 Hooks ====================
 
+export const useTasks = (params?: { skip?: number; limit?: number; project_id?: number; status_filter?: string; assignee_id?: number; }) => {
+  const stable = useRef(params);
+  stable.current = params;
+  return useApi(
+    () => taskApi.getTasks(stable.current),
+    [params?.skip, params?.limit, params?.project_id, params?.status_filter, params?.assignee_id]
+  );
+};
+
 export const useMyTasks = () => {
   return useApi(() => taskApi.getMyTasks());
 };
@@ -525,10 +536,7 @@ export const useDeleteUser = () => {
 export const useCreateProject = () => {
   const [loading, setLoading] = useState(false);
 
-  const createProject = async (projectData: {
-    name: string;
-    description: string;
-  }) => {
+  const createProject = async (projectData: CreateProjectData) => {
     setLoading(true);
     try {
       const response = await projectApi.createProject(projectData);
@@ -550,6 +558,56 @@ export const useCreateProject = () => {
   return { createProject, loading };
 };
 
+export const useUpdateProject = () => {
+  const [loading, setLoading] = useState(false);
+
+  const updateProject = async (id: string, projectData: UpdateProjectData) => {
+    setLoading(true);
+    try {
+      const response = await projectApi.updateProject(id, projectData);
+      if (response.success) {
+        message.success('项目更新成功');
+        return response.data;
+      } else {
+        message.error(response.message || '更新失败');
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      message.error('更新项目失败');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { updateProject, loading };
+};
+
+export const useDeleteProject = () => {
+  const [loading, setLoading] = useState(false);
+
+  const deleteProject = async (id: string) => {
+    setLoading(true);
+    try {
+      const response = await projectApi.deleteProject(id);
+      if (response.success) {
+        message.success('项目删除成功');
+        return response.data;
+      } else {
+        message.error(response.message || '删除失败');
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      message.error('删除项目失败');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { deleteProject, loading };
+};
+
 export const useCreateTask = () => {
   const [loading, setLoading] = useState(false);
 
@@ -557,9 +615,10 @@ export const useCreateTask = () => {
     title: string;
     description: string;
     priority: 'low' | 'medium' | 'high';
-    assigned_to?: string;
-    project_id?: string;
-    parent_task_id?: string;
+    assignee_id?: number;
+    project_id?: number;
+    parent_task_id?: number;
+    due_date?: string;
   }) => {
     setLoading(true);
     try {

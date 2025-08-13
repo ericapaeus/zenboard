@@ -21,7 +21,7 @@ class Message(Base):
     entity_id = Column(Integer, nullable=True, comment="关联实体ID")
 
     # 触发者
-    actor_id = Column(Integer, nullable=True, comment="触发者用户ID，系统产生可为空")
+    actor_id = Column(Integer, ForeignKey("user.id", name="fk_message_actor_user"), nullable=True, comment="触发者用户ID，系统产生可为空")
 
     # 结构化上下文
     data_json = Column(Text, nullable=True, comment="结构化上下文JSON")
@@ -30,12 +30,13 @@ class Message(Base):
     created_at = Column(DateTime, server_default=func.now(), comment="创建时间")
 
     # 关系
-    recipients = relationship(
+    message_recipients = relationship(
         "MessageRecipient",
         back_populates="message",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    actor = relationship("User", back_populates="messages")
 
 
 class MessageRecipient(Base):
@@ -51,7 +52,7 @@ class MessageRecipient(Base):
         index=True,
         comment="消息ID",
     )
-    recipient_user_id = Column(Integer, nullable=False, index=True, comment="接收人用户ID")
+    recipient_user_id = Column(Integer, ForeignKey("user.id", name="fk_message_recipient_user"), nullable=False, index=True, comment="接收人用户ID")
 
     read = Column(Boolean, nullable=False, server_default="0", index=True, comment="是否已读")
     read_at = Column(DateTime, nullable=True, comment="已读时间")
@@ -59,4 +60,5 @@ class MessageRecipient(Base):
     deleted = Column(Boolean, nullable=False, server_default="0", comment="是否删除")
 
     # 关系
-    message = relationship("Message", back_populates="recipients")
+    message = relationship("Message", back_populates="message_recipients")
+    user = relationship("User", back_populates="message_recipients")

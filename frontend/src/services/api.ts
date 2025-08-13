@@ -7,7 +7,9 @@ import type {
   Diary, 
   Contract, 
   Document, 
-  DocumentComment 
+  DocumentComment,
+  CreateProjectData,
+  UpdateProjectData
 } from '@/types';
 
 // 认证相关 API
@@ -202,15 +204,12 @@ export const projectApi = {
   },
 
   // 创建项目
-  createProject: (projectData: {
-    name: string;
-    description: string;
-  }): Promise<ApiResponse<Project>> => {
+  createProject: (projectData: CreateProjectData): Promise<ApiResponse<Project>> => {
     return api.post('/api/project', projectData);
   },
 
   // 更新项目
-  updateProject: (id: string, projectData: Partial<Project>): Promise<ApiResponse<Project>> => {
+  updateProject: (id: string, projectData: UpdateProjectData): Promise<ApiResponse<Project>> => {
     return api.put(`/api/project/${id}`, projectData);
   },
 
@@ -245,6 +244,18 @@ export const projectApi = {
 
 // 任务管理 API
 export const taskApi = {
+  // 通用列表（对接后端 GET /api/task）
+  getTasks: (params?: { skip?: number; limit?: number; project_id?: number; status_filter?: string; assignee_id?: number; }): Promise<ApiResponse<Task[]>> => {
+    const sp = new URLSearchParams();
+    if (params?.skip !== undefined) sp.append('skip', String(params.skip));
+    if (params?.limit !== undefined) sp.append('limit', String(params.limit));
+    if (params?.project_id !== undefined) sp.append('project_id', String(params.project_id));
+    if (params?.status_filter !== undefined) sp.append('status_filter', params.status_filter);
+    if (params?.assignee_id !== undefined) sp.append('assignee_id', String(params.assignee_id));
+    const q = sp.toString();
+    return api.get(`/api/task${q ? `?${q}` : ''}`);
+  },
+
   // 获取我的任务
   getMyTasks: (): Promise<ApiResponse<Task[]>> => {
     return api.get('/api/task/my');
@@ -265,20 +276,21 @@ export const taskApi = {
     return api.get(`/api/project/${projectId}/tasks`);
   },
 
-  // 创建任务
+  // 创建任务（对接后端 /api/task）
   createTask: (taskData: {
     title: string;
     description: string;
     priority: 'low' | 'medium' | 'high';
-    assigned_to?: string;
-    project_id?: string;
-    parent_task_id?: string;
+    assignee_id?: number;
+    project_id?: number;
+    parent_task_id?: number;
+    due_date?: string;
   }): Promise<ApiResponse<Task>> => {
     return api.post('/api/task', taskData);
   },
 
   // 更新任务
-  updateTask: (id: string, taskData: Partial<Task>): Promise<ApiResponse<Task>> => {
+  updateTask: (id: number, taskData: Partial<{ title: string; description: string; priority: 'low' | 'medium' | 'high'; assignee_id?: number; project_id?: number; parent_task_id?: number; status?: 'pending' | 'completed'; due_date?: string; }>): Promise<ApiResponse<Task>> => {
     return api.put(`/api/task/${id}`, taskData);
   },
 
@@ -288,7 +300,7 @@ export const taskApi = {
   },
 
   // 删除任务
-  deleteTask: (id: string): Promise<ApiResponse<null>> => {
+  deleteTask: (id: number): Promise<ApiResponse<null>> => {
     return api.delete(`/api/task/${id}`);
   },
 

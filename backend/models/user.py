@@ -33,12 +33,14 @@ class User(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
     
     # 关系
-    projects = relationship("ProjectMembership", back_populates="user")
-    tasks = relationship("Task", foreign_keys="Task.assignee_id", back_populates="assignee")
+    project_membership = relationship("ProjectMembership", back_populates="user")
+    assigned_tasks = relationship("Task", foreign_keys="Task.assignee_id", back_populates="assignee")
     created_tasks = relationship("Task", foreign_keys="Task.creator_id", back_populates="creator")
     comments = relationship("Comment", back_populates="author")
-    # 文档关系（与 Document.author back_populates 匹配）
     documents = relationship("Document", back_populates="author", cascade="all, delete-orphan")
+    document_comments = relationship("DocumentComment", back_populates="author")
+    messages = relationship("Message", back_populates="actor")
+    message_recipients = relationship("MessageRecipient", back_populates="user")
 
     def __repr__(self):
         return f"<User(id={self.id}, openid='{self.openid}')>" 

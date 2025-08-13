@@ -1,44 +1,30 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel
+from typing import List, Optional
 from datetime import datetime
 
-class ProjectBase(BaseModel):
-    name: str = Field(..., description="项目名称", max_length=100)
-    description: Optional[str] = Field(None, description="项目描述")
-
-class ProjectCreate(ProjectBase):
-    pass
+class ProjectCreate(BaseModel):
+    name: str
+    description: str
+    user_ids: Optional[List[int]] = []
 
 class ProjectUpdate(BaseModel):
-    name: Optional[str] = Field(None, description="项目名称", max_length=100)
-    description: Optional[str] = Field(None, description="项目描述")
-    status: Optional[str] = Field(None, description="项目状态")
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    user_ids: Optional[List[int]] = None
 
-class ProjectResponse(ProjectBase):
-    id: int
+class ProjectResponse(BaseModel):
+    id: str
+    name: str
+    description: str
     status: str
-    creator_id: int
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class ProjectMembershipBase(BaseModel):
-    role: str = Field("member", description="成员角色")
-
-class ProjectMembershipCreate(ProjectMembershipBase):
-    user_id: int = Field(..., description="用户ID")
-
-class ProjectMembershipResponse(ProjectMembershipBase):
-    id: int
-    project_id: int
-    user_id: int
-    joined_at: datetime
-    user: "UserResponse"
-
-    class Config:
-        from_attributes = True
+    created_by: str
+    created_at: str
+    updated_at: str
+    user_ids: List[int] = []  # 添加成员ID列表
+    member_count: int = 0      # 添加成员数量
 
 class ProjectWithMembers(ProjectResponse):
-    members: List[ProjectMembershipResponse] = [] 
+    user_ids: List[int]
+    task_count: int = 0
+    completed_task_count: int = 0 

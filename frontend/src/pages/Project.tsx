@@ -1,30 +1,27 @@
 import React from 'react';
-import { Card, Typography, Button, Modal, Form, Input, Select, Avatar, Tag, Space, Row, Col, Statistic, Pagination, Dropdown } from 'antd';
-import { PlusOutlined, UserOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, SearchOutlined, MoreOutlined, EditOutlined } from '@ant-design/icons';
-import { message } from 'antd';
+import { Card, Typography, Button, Modal, Form, Input, Select, Avatar, Tag, Space, Row, Col, Statistic, Pagination, Dropdown, message } from 'antd';
+import { PlusOutlined, UserOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, SearchOutlined, MoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { generateProjectColor } from '@/utils/colorGenerator';
+// 导入 API hooks
+import { 
+  useProjects, 
+  useAuthUsers, 
+  useCreateProject,
+  useUpdateProject,
+  useDeleteProject,
+  useCreateMessage
+} from '@/hooks/useApi';
+import type { 
+  Project, 
+  User, 
+  ProjectWithMembers, 
+  CreateProjectData, 
+  UpdateProjectData 
+} from '@/types';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-
-interface Project {
-  id: string;
-  name: string;
-  description: string;
-  members: string[];
-  taskCount: number;
-  completedTaskCount: number;
-  status: 'active' | 'archived';
-}
-
-// Mock user data for demonstration
-const mockUsers = [
-  { id: 'u1', name: '张三', avatar: '张' },
-  { id: 'u2', name: '李四', avatar: '李' },
-  { id: 'u3', name: '王五', avatar: '王' },
-  { id: 'u4', name: '赵六', avatar: '赵' },
-];
 
 const Projects: React.FC = () => {
   const navigate = useNavigate();
@@ -35,82 +32,42 @@ const Projects: React.FC = () => {
   const [searchForm] = Form.useForm();
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(8);
-  const [filteredProjects, setFilteredProjects] = React.useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = React.useState<Project | null>(null);
-  const [projects, setProjects] = React.useState<Project[]>([
-    {
-      id: 'p1',
-      name: 'ZenBoard 后端开发',
-      description: '负责 ZenBoard 项目的后端 API 设计与实现',
-      members: ['u1', 'u2'],
-      taskCount: 12,
-      completedTaskCount: 8,
-      status: 'active',
-    },
-    {
-      id: 'p2',
-      name: 'ZenBoard 前端优化',
-      description: '专注于 ZenBoard 用户界面的开发与优化',
-      members: ['u2', 'u3'],
-      taskCount: 8,
-      completedTaskCount: 5,
-      status: 'active',
-    },
-    {
-      id: 'p3',
-      name: 'ZenBoard 数据库优化',
-      description: '负责数据库结构设计、性能优化以及数据迁移工作',
-      members: ['u1', 'u4'],
-      taskCount: 6,
-      completedTaskCount: 4,
-      status: 'active',
-    },
-    {
-      id: 'p4',
-      name: 'ZenBoard UI/UX 设计',
-      description: '负责 ZenBoard 产品的用户界面和用户体验设计',
-      members: ['u3', 'u4'],
-      taskCount: 10,
-      completedTaskCount: 7,
-      status: 'active',
-    },
-    {
-      id: 'p5',
-      name: '移动端开发',
-      description: '负责移动端应用的开发与维护',
-      members: ['u1', 'u3'],
-      taskCount: 15,
-      completedTaskCount: 10,
-      status: 'active',
-    },
-    {
-      id: 'p6',
-      name: '测试自动化',
-      description: '建立自动化测试体系，提升代码质量',
-      members: ['u2', 'u4'],
-      taskCount: 9,
-      completedTaskCount: 6,
-      status: 'active',
-    },
-    {
-      id: 'p7',
-      name: 'DevOps 部署',
-      description: '负责持续集成和部署流程的优化',
-      members: ['u1', 'u2', 'u3'],
-      taskCount: 7,
-      completedTaskCount: 4,
-      status: 'active',
-    },
-    {
-      id: 'p8',
-      name: '性能监控',
-      description: '建立系统性能监控和告警机制',
-      members: ['u3', 'u4'],
-      taskCount: 11,
-      completedTaskCount: 8,
-      status: 'active',
-    },
-  ]);
+  const [filteredProjects, setFilteredProjects] = React.useState<ProjectWithMembers[]>([]);
+  const [selectedProject, setSelectedProject] = React.useState<ProjectWithMembers | null>(null);
+
+  // 使用 API hooks 获取数据
+  const { data: projectsData, loading: projectsLoading, refetch: refetchProjects } = useProjects();
+  const { data: usersData, loading: usersLoading } = useAuthUsers();
+  const { createProject, loading: createLoading } = useCreateProject();
+  const { updateProject, loading: updateLoading } = useUpdateProject();
+  const { deleteProject, loading: deleteLoading } = useDeleteProject();
+  const { createMessage, loading: messageLoading } = useCreateMessage();
+
+  // 转换后端数据为前端格式
+  const projects = React.useMemo(() => {
+    if (!projectsData) return [];
+    return projectsData.map((project: any) => ({
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      status: project.status || 'active',
+      created_by: project.created_by,
+      created_at: project.created_at,
+      updated_at: project.updated_at,
+      user_ids: project.user_ids || [],
+      task_count: project.task_count || 0,
+      completed_task_count: project.completed_task_count || 0
+    }));
+  }, [projectsData]);
+
+  // 从 API 获取用户选项
+  const userOptions = React.useMemo(() => {
+    if (!usersData) return [];
+    return usersData.map(user => ({
+      label: user.name || `用户${user.id}`,
+      value: user.id
+    }));
+  }, [usersData]);
 
   // 搜索和筛选功能
   const handleSearch = (values: any) => {
@@ -128,7 +85,7 @@ const Projects: React.FC = () => {
     // 成员筛选
     if (values.member && values.member !== 'all') {
       filtered = filtered.filter(project => 
-        project.members.includes(values.member)
+        project.user_ids?.includes(parseInt(values.member))
       );
     }
     
@@ -162,13 +119,13 @@ const Projects: React.FC = () => {
     createForm.resetFields();
   };
 
-  const handleEditModalOpen = (project: Project) => {
+  const handleEditModalOpen = (project: ProjectWithMembers) => {
     setSelectedProject(project);
     setIsEditModalVisible(true);
     editForm.setFieldsValue({
       name: project.name,
       description: project.description,
-      members: project.members,
+      user_ids: project.user_ids,
     });
   };
 
@@ -179,66 +136,210 @@ const Projects: React.FC = () => {
   };
 
   const handleCreateProject = async (values: any) => {
-    const newProject: Project = {
-      id: `p${Date.now()}`,
-      name: values.name,
-      description: values.description,
-      members: values.members || [],
-      taskCount: 0,
-      completedTaskCount: 0,
-      status: 'active',
-    };
-    setProjects(prevProjects => [...prevProjects, newProject]);
-    message.success('项目创建成功！');
-    handleCreateModalCancel();
+    try {
+      const createData: CreateProjectData = {
+        name: values.name,
+        description: values.description,
+        user_ids: values.user_ids || []
+      };
+      
+      const createdProject = await createProject(createData);
+      message.success('项目创建成功！');
+      handleCreateModalCancel();
+      refetchProjects(); // 重新获取项目列表
+
+      // 项目创建成功后，尝试创建消息（不阻塞流程）
+      try {
+        await createMessage({
+          type: 'project',
+          level: 'info',
+          title: `新项目：${values.name}`,
+          content: '创建了新项目',
+          entity_type: 'project',
+          entity_id: createdProject?.id ? parseInt(createdProject.id) : undefined,
+          data_json: JSON.stringify({
+            action: 'created',
+            name: values.name,
+            description: values.description,
+            user_ids: values.user_ids || []
+          }),
+          recipient_user_ids: values.user_ids || []
+        });
+      } catch (e) {
+        console.error('创建项目消息失败：', e);
+      }
+    } catch (error: any) {
+      message.error(`创建失败: ${error?.message || '未知错误'}`);
+    }
   };
 
   const handleEditProject = async (values: any) => {
     if (selectedProject) {
-      const updatedProjects = projects.map(project =>
-        project.id === selectedProject.id
-          ? { ...project, ...values }
-          : project
-      );
-      setProjects(updatedProjects);
-      message.success('项目更新成功！');
-      handleEditModalCancel();
+      try {
+        const updateData: UpdateProjectData = {
+          name: values.name,
+          description: values.description,
+          user_ids: values.user_ids || []
+        };
+        
+        await updateProject(selectedProject.id, updateData);
+        message.success('项目更新成功！');
+        handleEditModalCancel();
+        refetchProjects(); // 重新获取项目列表
+
+        // 项目更新成功后，尝试创建消息（不阻塞流程）
+        try {
+          await createMessage({
+            type: 'project',
+            level: 'info',
+            title: `项目已更新：${values.name}`,
+            content: '项目信息已更新',
+            entity_type: 'project',
+            entity_id: parseInt(selectedProject.id),
+            data_json: JSON.stringify({
+              action: 'updated',
+              name: values.name,
+              description: values.description,
+              user_ids: values.user_ids || []
+            }),
+            recipient_user_ids: values.user_ids || []
+          });
+        } catch (e) {
+          console.error('创建项目更新消息失败：', e);
+        }
+      } catch (error: any) {
+        message.error(`更新失败: ${error?.message || '未知错误'}`);
+      }
     }
   };
 
-  const getMemberNames = (memberIds: string[]) => {
-    return mockUsers
-      .filter(user => memberIds.includes(user.id))
-      .map(user => user.name);
+  const handleDeleteProject = async (projectId: string) => {
+    // 先获取项目信息，用于消息记录
+    const projectToDelete = projects.find(p => p.id === projectId);
+    
+    Modal.confirm({
+      title: '确认删除项目',
+      content: '删除后项目将无法恢复，确定要删除吗？',
+      okText: '删除',
+      cancelText: '取消',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await deleteProject(projectId);
+          message.success('项目删除成功！');
+          refetchProjects();
+
+          // 项目删除成功后，尝试创建消息（不阻塞流程）
+          if (projectToDelete) {
+            try {
+              await createMessage({
+                type: 'project',
+                level: 'warning',
+                title: `项目已删除：${projectToDelete.name}`,
+                content: '项目已被删除',
+                entity_type: 'project',
+                entity_id: parseInt(projectId),
+                data_json: JSON.stringify({
+                  action: 'deleted',
+                  name: projectToDelete.name,
+                  description: projectToDelete.description,
+                  user_ids: projectToDelete.user_ids || []
+                }),
+                recipient_user_ids: projectToDelete.user_ids || []
+              });
+            } catch (e) {
+              console.error('创建项目删除消息失败：', e);
+            }
+          }
+        } catch (error: any) {
+          message.error(`删除失败: ${error?.message || '未知错误'}`);
+        }
+      },
+    });
   };
 
-  const getMemberAvatars = (memberIds: string[]) => {
-    return mockUsers
-      .filter(user => memberIds.includes(user.id))
-      .map(user => ({ name: user.name, avatar: user.avatar }));
+  const getMemberNames = (userIds: number[]) => {
+    if (!usersData) return [];
+    return usersData
+      .filter(user => userIds.includes(user.id))
+      .map(user => user.name || `用户${user.id}`);
+  };
+
+  const getMemberAvatars = (userIds: number[]) => {
+    if (!usersData) return [];
+    return usersData
+      .filter(user => userIds.includes(user.id))
+      .map(user => ({ 
+        name: user.name || `用户${user.id}`, 
+        avatar: user.name ? user.name.charAt(0) : `U${user.id}` 
+      }));
   };
 
   // 项目状态管理
-  const handleArchiveProject = (projectId: string) => {
-    setProjects(prevProjects => 
-      prevProjects.map(project => 
-        project.id === projectId 
-          ? { ...project, status: 'archived' as const }
-          : project
-      )
-    );
-    message.success('项目已归档');
+  const handleArchiveProject = async (projectId: string) => {
+    try {
+      const projectToArchive = projects.find(p => p.id === projectId);
+      await updateProject(projectId, { status: 'archived' });
+      message.success('项目已归档');
+      refetchProjects();
+
+      // 项目归档成功后，尝试创建消息（不阻塞流程）
+      if (projectToArchive) {
+        try {
+          await createMessage({
+            type: 'project',
+            level: 'info',
+            title: `项目已归档：${projectToArchive.name}`,
+            content: '项目状态已变更为已归档',
+            entity_type: 'project',
+            entity_id: parseInt(projectId),
+            data_json: JSON.stringify({
+              action: 'archived',
+              name: projectToArchive.name,
+              status: 'archived'
+            }),
+            recipient_user_ids: projectToArchive.user_ids || []
+          });
+        } catch (e) {
+          console.error('创建项目归档消息失败：', e);
+        }
+      }
+    } catch (error: any) {
+      message.error(`归档失败: ${error?.message || '未知错误'}`);
+    }
   };
 
-  const handleActivateProject = (projectId: string) => {
-    setProjects(prevProjects => 
-      prevProjects.map(project => 
-        project.id === projectId 
-          ? { ...project, status: 'active' as const }
-          : project
-      )
-    );
-    message.success('项目已激活');
+  const handleActivateProject = async (projectId: string) => {
+    try {
+      const projectToActivate = projects.find(p => p.id === projectId);
+      await updateProject(projectId, { status: 'active' });
+      message.success('项目已激活');
+      refetchProjects();
+
+      // 项目激活成功后，尝试创建消息（不阻塞流程）
+      if (projectToActivate) {
+        try {
+          await createMessage({
+            type: 'project',
+            level: 'info',
+            title: `项目已激活：${projectToActivate.name}`,
+            content: '项目状态已变更为活跃',
+            entity_type: 'project',
+            entity_id: parseInt(projectId),
+            data_json: JSON.stringify({
+              action: 'activated',
+              name: projectToActivate.name,
+              status: 'active'
+            }),
+            recipient_user_ids: projectToActivate.user_ids || []
+          });
+        } catch (e) {
+          console.error('创建项目激活消息失败：', e);
+        }
+      }
+    } catch (error: any) {
+      message.error(`激活失败: ${error?.message || '未知错误'}`);
+    }
   };
 
   // 获取状态标签
@@ -251,7 +352,7 @@ const Projects: React.FC = () => {
   };
 
   // 获取项目操作菜单
-  const getProjectActions = (project: Project) => {
+  const getProjectActions = (project: ProjectWithMembers) => {
     const items = [
       {
         key: 'view',
@@ -283,6 +384,14 @@ const Projects: React.FC = () => {
       });
     }
 
+    // 添加删除选项
+    items.push({
+      key: 'delete',
+      label: '删除项目',
+      icon: <DeleteOutlined />,
+      onClick: () => handleDeleteProject(project.id),
+    });
+
     return items;
   };
 
@@ -313,10 +422,10 @@ const Projects: React.FC = () => {
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
               <Form.Item name="member" className="w-full mb-0">
-                <Select placeholder="选择成员" allowClear>
+                <Select placeholder="选择成员" allowClear loading={usersLoading}>
                   <Option value="all">全部成员</Option>
-                  {mockUsers.map(user => (
-                    <Option key={user.id} value={user.id}>{user.name}</Option>
+                  {userOptions.map(user => (
+                    <Option key={user.value} value={user.value}>{user.label}</Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -383,7 +492,7 @@ const Projects: React.FC = () => {
                   <Col span={12}>
                     <Statistic
                       title="总任务"
-                      value={project.taskCount}
+                      value={project.task_count || 0}
                       prefix={<ClockCircleOutlined />}
                       valueStyle={{ fontSize: '16px' }}
                     />
@@ -391,23 +500,23 @@ const Projects: React.FC = () => {
                   <Col span={12}>
                     <Statistic
                       title="已完成"
-                      value={project.completedTaskCount}
+                      value={project.completed_task_count || 0}
                       prefix={<CheckCircleOutlined />}
                       valueStyle={{ fontSize: '16px', color: '#52c41a' }}
                     />
                   </Col>
                 </Row>
-                {project.taskCount > 0 && (
+                {(project.task_count || 0) > 0 && (
                   <div className="mt-2">
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
                       <span>进度</span>
-                      <span>{Math.round((project.completedTaskCount / project.taskCount) * 100)}%</span>
+                      <span>{Math.round(((project.completed_task_count || 0) / (project.task_count || 1)) * 100)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="h-2 rounded-full transition-all duration-300"
                         style={{ 
-                          width: `${(project.completedTaskCount / project.taskCount) * 100}%`,
+                          width: `${((project.completed_task_count || 0) / (project.task_count || 1)) * 100}%`,
                             backgroundColor: projectColor
                         }}
                       />
@@ -421,7 +530,7 @@ const Projects: React.FC = () => {
                 <Text strong className="text-sm mb-2 block">项目成员</Text>
                 <div className="flex items-center gap-2">
                   <Avatar.Group maxCount={3} size="small">
-                    {getMemberAvatars(project.members).map((member, index) => (
+                    {getMemberAvatars(project.user_ids || []).map((member, index) => (
                       <Avatar 
                         key={index} 
                           style={{ backgroundColor: projectColor }}
@@ -431,9 +540,9 @@ const Projects: React.FC = () => {
                       </Avatar>
                     ))}
                   </Avatar.Group>
-                  {project.members.length > 0 && (
+                  {(project.user_ids || []).length > 0 && (
                     <Text type="secondary" className="text-xs">
-                      {getMemberNames(project.members).join('、')}
+                      {getMemberNames(project.user_ids || []).join('、')}
                     </Text>
                   )}
                 </div>
@@ -463,9 +572,10 @@ const Projects: React.FC = () => {
       {/* Create Project Modal */}
       <Modal
         title="添加项目"
-        visible={isCreateModalVisible}
+        open={isCreateModalVisible}
         onCancel={handleCreateModalCancel}
         footer={null}
+        confirmLoading={createLoading}
       >
         <Form
           form={createForm}
@@ -487,17 +597,19 @@ const Projects: React.FC = () => {
             <Input.TextArea rows={3} placeholder="请输入项目描述" />
           </Form.Item>
           <Form.Item
-            name="members"
+            name="user_ids"
             label="项目成员"
           >
             <Select
               mode="multiple"
               placeholder="请选择项目成员"
-              options={mockUsers.map(user => ({ value: user.id, label: user.name }))}
+              options={userOptions}
+              loading={usersLoading}
+              allowClear
             />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
+            <Button type="primary" htmlType="submit" block loading={createLoading}>
               创建项目
             </Button>
           </Form.Item>
@@ -507,9 +619,10 @@ const Projects: React.FC = () => {
       {/* Edit Project Modal */}
       <Modal
         title="编辑项目"
-        visible={isEditModalVisible}
+        open={isEditModalVisible}
         onCancel={handleEditModalCancel}
         footer={null}
+        confirmLoading={updateLoading}
       >
         <Form
           form={editForm}
@@ -531,17 +644,19 @@ const Projects: React.FC = () => {
             <Input.TextArea rows={3} placeholder="请输入项目描述" />
           </Form.Item>
           <Form.Item
-            name="members"
+            name="user_ids"
             label="项目成员"
           >
             <Select
               mode="multiple"
               placeholder="请选择项目成员"
-              options={mockUsers.map(user => ({ value: user.id, label: user.name }))}
+              options={userOptions}
+              loading={usersLoading}
+              allowClear
             />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
+            <Button type="primary" htmlType="submit" block loading={updateLoading}>
               保存更改
             </Button>
           </Form.Item>

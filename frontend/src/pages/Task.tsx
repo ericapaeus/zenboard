@@ -1,50 +1,16 @@
 import React, { useState } from 'react';
-import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm, Row, Col, Space, Avatar, Progress, Divider, Pagination, Tabs, Transfer, Checkbox, Radio, DatePicker } from 'antd';
-import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, SearchOutlined, SendOutlined, CheckCircleFilled, ClockCircleFilled, EditFilled, DownOutlined, RightOutlined } from '@ant-design/icons';
+import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm, Row, Col, Space, Avatar, Divider, Pagination, DatePicker } from 'antd';
+import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, SearchOutlined, CheckCircleFilled, ClockCircleFilled, EditFilled, DownOutlined, RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import type { Task, Subtask, TaskFlow } from '@/types';
+import { useProjects, useAuthUsers, useCreateTask, useTasks, useCreateMessage } from '@/hooks/useApi';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
-const { TabPane } = Tabs;
-const { RangePicker } = DatePicker;
-
-interface Subtask {
-  id: string;
-  title: string;
-  content: string;
-  assignee?: string; // 新增处理人字段
-  parentId?: string;
-  children?: Subtask[];
-}
-
-interface TaskFlow {
-  id: string;
-  fromUser: string;
-  toUser: string;
-  action: 'transfer' | 'complete';
-  notes: string;
-  timestamp: string;
-}
-
-interface Task {
-  id: string;
-  title: string;
-  content: string;
-  currentAssignee: string;
-  originalAssignee: string;
-  startDate: string;
-  endDate: string;
-  status: 'draft' | 'pending' | 'completed';
-  progress: number;
-  project?: string;
-  priority: 'low' | 'medium' | 'high';
-  subtasks: Subtask[];
-  completionNotes?: string;
-  flowHistory: TaskFlow[];
-  createdBy: string;
-  createdAt: string;
-}
+// const { RangePicker } = DatePicker;
 
 interface TaskProps {
   displayMode?: 'full' | 'pendingOnly';
@@ -180,23 +146,21 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   }, []);
 
   // 状态管理
-  const [activeTab, setActiveTab] = useState('pending');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchForm] = Form.useForm();
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
-  const [transferForm] = Form.useForm();
   const [subtaskForm] = Form.useForm();
   
   // 模态框状态
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [isTransferModalVisible, setIsTransferModalVisible] = useState(false);
+  // const [isTransferModalVisible, setIsTransferModalVisible] = useState(false); // 已删除
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showAddSubtaskForm, setShowAddSubtaskForm] = useState(false);
-  const [transferAction, setTransferAction] = useState<'transfer' | 'complete'>('transfer');
+  // const [transferAction, setTransferAction] = useState<'transfer' | 'complete'>('transfer'); // 已删除
 
   // 新增：折叠状态管理
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -218,111 +182,75 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   const isTaskExpanded = (taskId: string) => expandedTasks.has(taskId);
 
   // Mock data for tasks
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: '1',
-      title: '完成项目报告',
-      content: '撰写并提交本月的项目进度报告，包括已完成的工作、遇到的问题、解决方案和下一步计划。',
-      currentAssignee: '张三',
-      originalAssignee: '李四',
-      startDate: '2024-01-15',
-      endDate: '2024-01-25',
-      status: 'pending',
-      progress: 65,
-      project: 'ZenBoard 后端开发',
-      priority: 'high',
-      subtasks: [
-        {
-          id: 's1',
-          title: '收集数据',
-          content: '收集各部门的项目数据',
-        },
-        {
-          id: 's2',
-          title: '撰写初稿',
-          content: '根据收集的数据撰写报告初稿',
-        },
-      ],
-      flowHistory: [
-        {
-          id: 'f1',
-          fromUser: '李四',
-          toUser: '张三',
-          action: 'transfer',
-          notes: '需要技术细节补充',
-          timestamp: '2024-01-20 10:30:00'
-        }
-      ],
-      createdBy: '王五',
-      createdAt: '2024-01-15 09:00:00'
-    },
-    {
-      id: '2',
-      title: '安排团队会议',
-      content: '与团队成员协调时间，安排下周的团队例会。会议议程包括：项目进展汇报、问题讨论、下阶段任务分配。',
-      currentAssignee: '李四',
-      originalAssignee: '李四',
-      startDate: '2024-01-20',
-      endDate: '2024-01-22',
-      status: 'pending',
-      progress: 0,
-      project: 'ZenBoard 前端优化',
-      priority: 'medium',
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const { data: apiTasks, loading: tasksLoading, refetch: refetchTasks } = useTasks();
+
+  // 静态评论数据与输入框状态
+  type TaskComment = { id: number; author_id: number; author_name?: string; author_avatar?: string; content: string; created_at: string };
+  const [taskComments, setTaskComments] = useState<Record<string, TaskComment[]>>({
+    '1': [
+      { id: 1, author_id: 2, author_name: '李四', content: '先把基础数据补齐，我下班前看一版。', created_at: '2025-08-13 10:00:00' },
+      { id: 2, author_id: 3, author_name: '王五', content: 'OK，我下午两点前给到。', created_at: '2025-08-13 10:15:00' },
+    ],
+    '2': [
+      { id: 3, author_id: 4, author_name: '赵六', content: '会议议程我补充了两个点：质量与风险。', created_at: '2025-08-12 09:30:00' },
+    ],
+  });
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+
+  const addTaskComment = (taskId: string) => {
+    const content = (commentInputs[taskId] || '').trim();
+    if (!content) { message.error('请输入评论内容'); return; }
+    const nextId = Date.now();
+    const next: TaskComment = { id: nextId, author_id: 0, author_name: '当前用户', content, created_at: new Date().toISOString() };
+    setTaskComments(prev => ({ ...prev, [taskId]: [...(prev[taskId] || []), next] }));
+    setCommentInputs(prev => ({ ...prev, [taskId]: '' }));
+  };
+
+  const { data: projectsData } = useProjects();
+  const { data: usersData } = useAuthUsers();
+  const { createTask } = useCreateTask();
+  const { createMessage } = useCreateMessage();
+
+  const getUserName = (id?: number | null) => {
+    if (!id || !usersData) return '未分配';
+    const u = usersData.find(u => u.id === id);
+    return u?.name || `用户${id}`;
+  };
+
+  const getProjectName = (id?: string | null) => {
+    if (id === undefined || id === null || !projectsData) return undefined as unknown as string;
+    const p = projectsData.find(p => p.id === id);
+    return p?.name;
+  };
+
+  const mapApiTaskToUi = (t: any): Task => ({
+    id: String(t.id),
+    title: t.title,
+    content: t.description || '',
+    currentAssignee: getUserName(t.assignee_id),
+    originalAssignee: getUserName(t.original_assignee_id) || getUserName(t.assignee_id),
+    startDate: t.created_at ? new Date(t.created_at).toISOString().slice(0,10) : '',
+    endDate: t.due_date ? new Date(t.due_date).toISOString().slice(0,10) : '',
+    progress: typeof t.progress === 'number' ? t.progress : 0,
+    project: getProjectName(t.project_id != null ? String(t.project_id) : null),
+    priority: (t.priority || 'medium'),
       subtasks: [],
       flowHistory: [],
-      createdBy: '李四',
-      createdAt: '2024-01-20 14:00:00'
-    },
-    {
-      id: '3',
-      title: '审查代码',
-      content: '审查最新提交的模块代码，确保代码质量、符合编码规范、无潜在bug，并提供详细的代码审查报告。',
-      currentAssignee: '王五',
-      originalAssignee: '王五',
-      startDate: '2024-01-10',
-      endDate: '2024-01-15',
-      status: 'completed',
-      progress: 100,
-      project: 'ZenBoard 数据库优化',
-      priority: 'high',
-      subtasks: [
-        {
-          id: 's4',
-          title: '模块A代码审查',
-          content: '审查用户认证模块代码',
-        },
-      ],
-      flowHistory: [
-        {
-          id: 'f2',
-          fromUser: '王五',
-          toUser: '王五',
-          action: 'complete',
-          notes: '代码审查完成，质量良好',
-          timestamp: '2024-01-15 16:00:00'
-        }
-      ],
-      createdBy: '王五',
-      createdAt: '2024-01-10 10:00:00'
-    },
-  ]);
+    completionNotes: t.completion_notes || '',
+    createdBy: getUserName(t.creator_id),
+    createdAt: t.created_at || new Date().toISOString(),
+  });
 
-  // Mock users for assignment
-  const mockUsers = ['张三', '李四', '王五', '赵六', '孙七'];
-  const mockProjects = ['ZenBoard 后端开发', 'ZenBoard 前端优化', 'ZenBoard 数据库优化', 'ZenBoard UI/UX 设计'];
-
-  const getStatusTag = (status: Task['status']) => {
-    switch (status) {
-      case 'draft':
-        return <Tag color="default" icon={<EditFilled />}>起草中</Tag>;
-      case 'pending':
-        return <Tag color="processing" icon={<ClockCircleFilled />}>待处理</Tag>;
-      case 'completed':
-        return <Tag color="success" icon={<CheckCircleFilled />}>已完成</Tag>;
-      default:
-        return <Tag>未知</Tag>;
+  React.useEffect(() => {
+    if (apiTasks) {
+      const mapped = (apiTasks as any[]).map(mapApiTaskToUi);
+      setTasks(mapped);
     }
-  };
+  }, [apiTasks, usersData, projectsData]);
+
+  const mockUsers = (usersData || []).map(u => u.name || `用户${u.id}`);
+  const mockProjects = (projectsData || []).map(p => p.name);
 
   const getPriorityTag = (priority: Task['priority']) => {
     switch (priority) {
@@ -390,18 +318,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     editForm.resetFields();
   };
 
-  const handleTransferModalOpen = (task: Task) => {
-    setSelectedTask(task);
-    setIsTransferModalVisible(true);
-    transferForm.resetFields();
-    setTransferAction('transfer');
-  };
-
-  const handleTransferModalCancel = () => {
-    setIsTransferModalVisible(false);
-    setSelectedTask(null);
-    transferForm.resetFields();
-  };
+  // 已删除“处理任务/流转”相关逻辑
 
   const handleAddSubtask = (values: any) => {
     if (selectedTask) {
@@ -438,26 +355,24 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   };
 
   const handleCreateTask = async (values: any) => {
-    const newTask: Task = {
-      id: `t${Date.now()}`,
-      title: values.title,
-      content: values.content,
-      currentAssignee: values.assignee,
-      originalAssignee: values.assignee,
-      startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : '',
-      endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : '',
-      status: 'draft',
-      progress: 0,
-      project: values.project,
-      priority: values.priority,
-      subtasks: values.subtasks || [],
-      flowHistory: [],
-      createdBy: '当前用户',
-      createdAt: new Date().toISOString(),
-    };
-    setTasks(prevTasks => [...prevTasks, newTask]);
-    message.success('任务创建成功！');
-    handleCreateModalCancel();
+    try {
+      const created = await createTask({
+        title: values.title,
+        description: values.content,
+        priority: values.priority,
+        assignee_id: values.assignee_id,
+        project_id: values.project_id,
+        parent_task_id: undefined,
+        due_date: values.endDate ? values.endDate.format('YYYY-MM-DD') : undefined,
+      });
+      
+      message.success('任务创建成功！');
+      handleCreateModalCancel();
+      refetchTasks();
+      return created;
+    } catch (e) {
+      // 已在 hook 内提示
+    }
   };
 
   const handleEditTask = async (values: any) => {
@@ -484,71 +399,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
     message.success('任务删除成功！');
     handleDetailsModalCancel();
-  };
-
-  const handleTransferTask = async (values: any) => {
-    if (selectedTask) {
-      let newFlow: TaskFlow;
-      let updatedTask: Task;
-      let updatedTasks: Task[];
-
-      if (selectedTask.status === 'draft') {
-        // 起草任务派发逻辑
-        newFlow = {
-          id: `f${Date.now()}`,
-          fromUser: selectedTask.currentAssignee,
-          toUser: values.toUser,
-          action: 'transfer',
-          notes: '任务派发',
-          timestamp: new Date().toISOString(),
-        };
-
-        updatedTask = {
-          ...selectedTask,
-          currentAssignee: values.toUser,
-          status: 'pending',
-          flowHistory: [...selectedTask.flowHistory, newFlow],
-        };
-
-        updatedTasks = tasks.map(task =>
-          task.id === selectedTask.id ? updatedTask : task
-        );
-        setTasks(updatedTasks);
-        message.success('任务已派发！');
-        handleTransferModalCancel();
-      } else {
-        // 待办任务流转逻辑
-        newFlow = {
-          id: `f${Date.now()}`,
-          fromUser: selectedTask.currentAssignee,
-          toUser: values.toUser,
-          action: transferAction,
-          notes: values.notes,
-          timestamp: new Date().toISOString(),
-        };
-
-        updatedTask = {
-          ...selectedTask,
-          flowHistory: [...selectedTask.flowHistory, newFlow],
-          completionNotes: values.notes,
-        };
-
-        if (transferAction === 'complete') {
-          updatedTask.status = 'completed';
-          updatedTask.progress = 100;
-          message.success('任务已完成！');
-        } else {
-          updatedTask.currentAssignee = values.toUser;
-          message.success('任务已转交！');
-        }
-
-        updatedTasks = tasks.map(task =>
-          task.id === selectedTask.id ? updatedTask : task
-        );
-        setTasks(updatedTasks);
-        handleTransferModalCancel();
-      }
-    }
   };
 
   // 搜索和筛选功能
@@ -585,25 +435,17 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   };
 
   // 根据当前标签页过滤任务
-  const getTasksByStatus = (status: Task['status']) => {
-    return tasks.filter(task => task.status === status); // Changed from filteredTasks to tasks
-  };
+  const getTasksByStatus = (_status: Task['status']) => tasks;
 
   // 初始化筛选结果
   React.useEffect(() => {
-    // setFilteredTasks(tasks); // This line was removed from the new_code, so it's removed here.
+    // 后端获取完成后刷新分页
+    setCurrentPage(1);
   }, [tasks]);
 
   // 过滤和分页逻辑
   const getCurrentTabTasks = () => {
-    if (displayMode === 'pendingOnly') {
-      return getTasksByStatus('pending');
-    }
-    const statusMap: Record<string, Task['status']> = {
-      'pending': 'pending', 
-      'completed': 'completed'
-    };
-    return getTasksByStatus(statusMap[activeTab] || 'pending');
+    return tasks;
   };
 
   const currentTabTasks = getCurrentTabTasks();
@@ -621,24 +463,14 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         className="h-full shadow-sm"
         style={{ borderTop: `4px solid ${task.priority === 'high' ? '#ff4d4f' : task.priority === 'medium' ? '#faad14' : '#52c41a'}` }}
         actions={[
-          ...(task.status === 'pending' ? [
             <Button
+            key="edit"
               type="link"
-              icon={<SendOutlined />}
-              onClick={() => handleTransferModalOpen(task)}
+            icon={<EditOutlined />}
+            onClick={() => handleEditModalOpen(task)}
             >
-              处理任务
+            编辑
             </Button>
-          ] : []),
-          ...(task.status === 'draft' ? [
-            <Button
-              type="link"
-              icon={<SendOutlined />}
-              onClick={() => handleTransferModalOpen(task)}
-            >
-              派发任务
-            </Button>
-          ] : [])
         ]}
       >
         <div className="mb-4">
@@ -646,7 +478,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             <Title level={4} className="m-0 flex-1 mr-2">{task.title}</Title>
             <Space>
               {getPriorityTag(task.priority)}
-              {getStatusTag(task.status)}
             </Space>
           </div>
           
@@ -658,7 +489,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             <Col xs={24} sm={8}>
               <div className="flex items-center gap-2">
                 <UserOutlined className="text-gray-400" />
-                <Text type="secondary">当前处理人: {task.currentAssignee}</Text>
+                <Text type="secondary">任务负责人: {task.currentAssignee}</Text>
               </div>
             </Col>
             
@@ -681,36 +512,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
           <Divider className="my-3" />
 
-          <Row gutter={16} align="middle">
-            <Col xs={24} sm={16}>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Text strong>完成进度</Text>
-                  <Text type="secondary">{task.progress}%</Text>
-                </div>
-                <Progress 
-                  percent={task.progress} 
-                  size="small"
-                  strokeColor={task.status === 'completed' ? '#52c41a' : task.status === 'pending' ? '#1890ff' : '#d9d9d9'}
-                />
-              </div>
-            </Col>
-            
-            <Col xs={24} sm={8}>
               {task.subtasks.length > 0 && (
-                <div className="flex items-center gap-2">
+            <div className="mt-2 flex items-center gap-2">
                   <CheckCircleOutlined className="text-gray-400" />
                   <Text type="secondary">子任务: {task.subtasks.length} 个</Text>
-                </div>
-              )}
-            </Col>
-          </Row>
-
-          {task.flowHistory.length > 0 && (
-            <div className="mt-3">
-              <Text type="secondary" className="text-xs">
-                流转次数: {task.flowHistory.length} 次
-              </Text>
             </div>
           )}
         </div>
@@ -736,47 +541,14 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             padding: '20px'
           }}
           actions={[
-            ...(displayMode === 'full' && task.status === 'pending' ? [
               <Button
-                type="link"
-                icon={<SendOutlined />}
-                onClick={() => handleTransferModalOpen(task)}
-              >
-                处理任务
-              </Button>,
-              <Button
+              key="edit"
                 type="link"
                 icon={<EditOutlined />}
                 onClick={() => handleEditModalOpen(task)}
               >
                 编辑
               </Button>
-            ] : []),
-            ...(displayMode === 'full' && task.status === 'draft' ? [
-              <Button
-                type="link"
-                icon={<SendOutlined />}
-                onClick={() => handleTransferModalOpen(task)}
-              >
-                派发任务
-              </Button>
-            ] : []),
-            ...(displayMode === 'pendingOnly' && task.status === 'pending' ? [
-              <Button
-                type="link"
-                icon={<SendOutlined />}
-                onClick={() => handleTransferModalOpen(task)}
-              >
-                处理任务
-              </Button>,
-              <Button
-                type="link"
-                icon={<EditOutlined />}
-                onClick={() => handleEditModalOpen(task)}
-              >
-                编辑
-              </Button>
-            ] : [])
           ]}
         >
           {/* 任务基本信息 */}
@@ -809,7 +581,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               </div>
               <Space>
                 {getPriorityTag(task.priority)}
-                {getStatusTag(task.status)}
               </Space>
             </div>
             
@@ -821,7 +592,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               <Col xs={24} sm={8}>
                 <div className="flex items-center gap-2">
                   <UserOutlined className="text-gray-400" />
-                  <Text type="secondary">当前处理人: {task.currentAssignee}</Text>
+                  <Text type="secondary">任务负责人: {task.currentAssignee}</Text>
                 </div>
               </Col>
               
@@ -844,36 +615,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
             <Divider className="my-3" />
 
-            <Row gutter={16} align="middle">
-              <Col xs={24} sm={16}>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Text strong>完成进度</Text>
-                    <Text type="secondary">{task.progress}%</Text>
-                  </div>
-                  <Progress 
-                    percent={task.progress} 
-                    size="small"
-                    strokeColor={task.status === 'completed' ? '#52c41a' : task.status === 'pending' ? '#1890ff' : '#d9d9d9'}
-                  />
-                </div>
-              </Col>
-              
-              <Col xs={24} sm={8}>
                 {task.subtasks.length > 0 && (
-                  <div className="flex items-center gap-2">
+              <div className="mt-2 flex items-center gap-2">
                     <CheckCircleOutlined className="text-gray-400" />
                     <Text type="secondary">子任务: {task.subtasks.length} 个</Text>
-                  </div>
-                )}
-              </Col>
-            </Row>
-
-            {task.flowHistory.length > 0 && (
-              <div className="mt-3">
-                <Text type="secondary" className="text-xs">
-                  流转次数: {task.flowHistory.length} 次
-                </Text>
               </div>
             )}
           </div>
@@ -912,92 +657,42 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                   />
                 </div>
               )}
-
-              {/* 完成情况记录 */}
+              {/* 评论 */}
               <div className="mb-6">
-                <Title level={5} className="mb-3">完成情况记录</Title>
-                {task.flowHistory.length > 0 ? (
+                <Title level={5} className="mb-3">评论</Title>
                   <List
                     size="small"
                     bordered
-                    dataSource={task.flowHistory}
-                    renderItem={flow => (
+                  dataSource={taskComments[task.id] || []}
+                  locale={{ emptyText: '暂无评论' }}
+                  renderItem={(c: any) => (
                       <List.Item>
-                        <div className="w-full">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar size="small" icon={<UserOutlined />} />
-                              <Text strong>
-                                {flow.fromUser} → {flow.toUser}
-                              </Text>
+                      <List.Item.Meta
+                        avatar={<Avatar size="small" icon={<UserOutlined />} />}
+                        title={<Text strong>{c.author_name || `用户${c.author_id}`}</Text>}
+                        description={
+                          <div>
+                            <div style={{ background: '#fff' }}>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.content}</ReactMarkdown>
                             </div>
-                            <div className="text-right">
-                              <Text type="secondary" className="text-xs block">
-                                {formatDateTime(flow.timestamp)}
-                              </Text>
-                              <Tag color={flow.action === 'transfer' ? 'blue' : 'green'}>
-                                {flow.action === 'transfer' ? '转交任务' : '完成任务'}
-                              </Tag>
+                            <Text type="secondary" className="text-xs">{formatDateTime(c.created_at)}</Text>
                             </div>
-                          </div>
-                          <div className="bg-gray-50 p-3 rounded-lg">
-                            <Text className="block">{flow.notes}</Text>
-                          </div>
-                        </div>
+                        }
+                      />
                       </List.Item>
                     )}
                   />
-                ) : (
-                  <div className="text-center py-8 text-gray-400">
-                    暂无完成情况记录
+                <div className="mt-3">
+                  <Input.TextArea
+                    rows={3}
+                    placeholder="输入评论，支持 Markdown"
+                    value={commentInputs[task.id] || ''}
+                    onChange={(e) => setCommentInputs(prev => ({ ...prev, [task.id]: e.target.value }))}
+                  />
+                  <div style={{ textAlign: 'right', marginTop: 8 }}>
+                    <Button type="primary" size="small" onClick={() => addTaskComment(task.id)}>添加评论</Button>
                   </div>
-                )}
               </div>
-
-              {/* 任务流转时间线 */}
-              <div>
-                <Title level={5} className="mb-3">任务流转时间线</Title>
-                <div className="flow-timeline">
-                  <div className="timeline-item">
-                    <div className="timeline-dot timeline-dot-start">
-                      <CheckCircleOutlined />
-                    </div>
-                    <div className="timeline-content">
-                      <div className="timeline-header">
-                        <Text strong>任务创建</Text>
-                        <Text type="secondary" className="text-xs ml-2">
-                          {formatDateTime(task.createdAt)}
-                        </Text>
-                      </div>
-                      <Text type="secondary">创建人: {task.createdBy}</Text>
-                      <Text type="secondary" className="block">初始处理人: {task.originalAssignee}</Text>
-                    </div>
-                  </div>
-
-                  {task.flowHistory.map((flow, index) => (
-                    <div key={flow.id} className="timeline-item">
-                      <div className={`timeline-dot ${flow.action === 'complete' ? 'timeline-dot-end' : 'timeline-dot-transfer'}`}>
-                        {flow.action === 'complete' ? <CheckCircleOutlined /> : <SendOutlined />}
-                      </div>
-                      <div className="timeline-content">
-                        <div className="timeline-header">
-                          <Text strong>
-                            {flow.action === 'transfer' ? '任务转交' : '任务完成'}
-                          </Text>
-                          <Text type="secondary" className="text-xs ml-2">
-                            {formatDateTime(flow.timestamp)}
-                          </Text>
-                        </div>
-                        <Text type="secondary">
-                          从 {flow.fromUser} {flow.action === 'transfer' ? '转交给' : '完成于'} {flow.toUser}
-                        </Text>
-                        <div className="bg-blue-50 p-2 rounded mt-2">
-                          <Text className="text-sm">{flow.notes}</Text>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           )}
@@ -1008,8 +703,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
   return (
     <div className="p-6">
-      {displayMode === 'full' && (
-        <>
           {/* 搜索区域 */}
           <Card className="mb-6 shadow-sm">
             <Form
@@ -1060,38 +753,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             </Form>
           </Card>
 
-          {/* 标签页 */}
-          <Card className="mb-6 shadow-sm">
-            <Tabs 
-              activeKey={activeTab} 
-              onChange={setActiveTab}
-              items={[
-                {
-                  key: 'pending',
-                  label: (
-                    <span>
-                      <ClockCircleFilled />
-                      待办任务 ({getTasksByStatus('pending').length})
-                    </span>
-                  ),
-                },
-                {
-                  key: 'completed',
-                  label: (
-                    <span>
-                      <CheckCircleFilled />
-                      已办任务 ({getTasksByStatus('completed').length})
-                    </span>
-                  ),
-                },
-              ]}
-            />
-          </Card>
-        </>
-      )}
-
       {/* 任务列表 */}
       {renderExpandableTaskList()}
+      {/* 可根据需要显示加载状态 */}
+      {/* {tasksLoading && <div style={{textAlign:'center', marginTop:12}}>加载中...</div>} */}
 
       {/* 分页组件 */}
       {currentTabTasks.length > 0 && (
@@ -1119,10 +784,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
       {currentTabTasks.length === 0 && (
         <div className="text-center py-12">
           <div className="text-gray-400 text-lg mb-2">
-            {displayMode === 'pendingOnly' ? '暂无待办任务' : (searchForm.getFieldValue('keyword') || searchForm.getFieldValue('member') ? '没有找到匹配的任务' : `暂无${activeTab === 'pending' ? '待办' : '已办'}任务`)}
+            {/* 已移除标签页 */}
           </div>
           <div className="text-gray-400 text-sm">
-            {displayMode === 'pendingOnly' ? '请稍后再试或联系管理员' : (searchForm.getFieldValue('keyword') || searchForm.getFieldValue('member') ? '请尝试调整搜索关键词' : '点击右上角按钮添加')}
+            {/* 已移除标签页 */}
           </div>
         </div>
       )}
@@ -1134,7 +799,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             <div className="flex items-center gap-2">
               <span>任务详情: {selectedTask.title}</span>
               {getPriorityTag(selectedTask.priority)}
-              {getStatusTag(selectedTask.status)}
             </div>
           }
           visible={isDetailsModalVisible}
@@ -1142,20 +806,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
           footer={[
             <Button key="back" onClick={handleDetailsModalCancel}>
               关闭
-            </Button>,
-            ...(selectedTask.status === 'pending' ? [
-              <Button key="transfer" icon={<SendOutlined />} onClick={() => handleTransferModalOpen(selectedTask)}>
-                处理任务
               </Button>,
               <Button key="edit" icon={<EditOutlined />} onClick={() => handleEditModalOpen(selectedTask)}>
                 编辑
-              </Button>
-            ] : []),
-            ...(selectedTask.status === 'draft' ? [
-              <Button key="transfer" icon={<SendOutlined />} onClick={() => handleTransferModalOpen(selectedTask)}>
-                派发任务
-              </Button>
-            ] : []),
+            </Button>,
             <Popconfirm
               title="确定要删除此任务吗？"
               onConfirm={() => handleDeleteTask(selectedTask.id)}
@@ -1172,7 +826,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
           <div className="space-y-4">
             <Row gutter={16}>
               <Col span={12}>
-                <Text strong>当前处理人:</Text> {selectedTask.currentAssignee}
+                <Text strong>任务负责人:</Text> {selectedTask.currentAssignee}
               </Col>
               <Col span={12}>
                 <Text strong>所属项目:</Text> {selectedTask.project || '未指定'}
@@ -1193,44 +847,39 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               <Paragraph className="mt-2">{selectedTask.content}</Paragraph>
             </div>
 
-            <div>
-              <Text strong>完成进度:</Text>
-              <Progress 
-                percent={selectedTask.progress} 
-                className="mt-2"
-                strokeColor={selectedTask.status === 'completed' ? '#52c41a' : '#1890ff'}
-              />
-            </div>
-
-            {/* 流转历史 */}
-            {selectedTask.flowHistory.length > 0 && (
-              <div>
+            {/* 评论 */}
                 <Divider />
-                <Title level={4}>流转历史</Title>
+            <Title level={4}>评论</Title>
                 <List
                   size="small"
-                  dataSource={selectedTask.flowHistory}
-                  renderItem={flow => (
+              dataSource={taskComments[selectedTask.id] || []}
+              locale={{ emptyText: '暂无评论' }}
+              renderItem={(c: any) => (
                     <List.Item>
-                      <div className="w-full">
-                        <div className="flex justify-between items-start mb-1">
-                          <Text strong>
-                            {flow.fromUser} → {flow.toUser}
-                          </Text>
-                          <Text type="secondary" className="text-xs">
-                            {formatDateTime(flow.timestamp)}
-                          </Text>
+                  <List.Item.Meta
+                    avatar={<Avatar size="small" icon={<UserOutlined />} />}
+                    title={<Text strong>{c.author_name || `用户${c.author_id}`}</Text>}
+                    description={
+                      <div>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.content}</ReactMarkdown>
+                        <Text type="secondary" className="text-xs">{formatDateTime(c.created_at)}</Text>
                         </div>
-                        <Text type="secondary" className="block mb-1">
-                          {flow.action === 'transfer' ? '转交任务' : '完成任务'}
-                        </Text>
-                        <Text className="block">{flow.notes}</Text>
-                      </div>
+                    }
+                  />
                     </List.Item>
                   )}
                 />
+            <div className="mt-3">
+              <Input.TextArea
+                rows={3}
+                placeholder="输入评论，支持 Markdown"
+                value={commentInputs[selectedTask.id] || ''}
+                onChange={(e) => setCommentInputs(prev => ({ ...prev, [selectedTask.id]: e.target.value }))}
+              />
+              <div style={{ textAlign: 'right', marginTop: 8 }}>
+                <Button type="primary" size="small" onClick={() => addTaskComment(selectedTask.id)}>添加评论</Button>
               </div>
-            )}
+            </div>
 
             <Divider />
 
@@ -1368,13 +1017,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
-                name="assignee"
-                label="初始处理人"
-                rules={[{ required: true, message: '请选择初始处理人！' }]}
+                name="assignee_id"
+                label="任务负责人"
+                rules={[{ required: true, message: '请选择任务负责人！' }]}
               >
-                <Select placeholder="选择初始处理人">
-                  {mockUsers.map(user => (
-                    <Option key={user} value={user}>{user}</Option>
+                <Select placeholder="选择任务负责人">
+                  {(usersData || []).map(user => (
+                    <Option key={user.id} value={user.id}>{user.name || `用户${user.id}`}</Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -1426,12 +1075,12 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
           </Row>
 
           <Form.Item
-            name="project"
+            name="project_id"
             label="所属项目"
           >
             <Select placeholder="选择所属项目（可选）">
-              {mockProjects.map(project => (
-                <Option key={project} value={project}>{project}</Option>
+              {(projectsData || []).map(project => (
+                <Option key={project.id} value={Number(project.id)}>{project.name}</Option>
               ))}
             </Select>
           </Form.Item>
@@ -1455,7 +1104,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                   添加子任务
                 </Button>
               </div>
-              
               <Form.List name="subtasks">
                 {(fields, { add, remove }) => (
                   <>
@@ -1471,7 +1119,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                             onClick={() => remove(name)}
                           />
                         </div>
-                        
                           <Row gutter={16}>
                             <Col span={24}>
                               <Form.Item
@@ -1482,6 +1129,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                                 <Input placeholder="子任务标题" />
                               </Form.Item>
                             </Col>
+                        </Row>
+                        <Row gutter={16}>
                             <Col span={24}>
                               <Form.Item
                                 {...restField}
@@ -1490,14 +1139,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                                 rules={[{ required: true, message: '请选择子任务处理人！' }]}
                               >
                                 <Select placeholder="选择处理人">
-                                  {mockUsers.map(user => (
-                                    <Option key={user} value={user}>{user}</Option>
+                                {(usersData || []).map(user => (
+                                  <Option key={user.id} value={user.name || `用户${user.id}`}>{user.name || `用户${user.id}`}</Option>
                                   ))}
                                 </Select>
                               </Form.Item>
                             </Col>
                           </Row>
-                          
                           <Row gutter={16}>
                             <Col span={24}>
                               <Form.Item
@@ -1511,12 +1159,6 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                           </Row>
                       </div>
                     ))}
-                    
-                    {fields.length === 0 && (
-                      <div className="text-center text-gray-400 py-4">
-                        暂无子任务，点击上方按钮添加
-                      </div>
-                    )}
                   </>
                 )}
               </Form.List>
@@ -1565,10 +1207,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               <Col span={12}>
                 <Form.Item
                   name="currentAssignee"
-                  label="当前处理人"
-                  rules={[{ required: true, message: '请选择当前处理人！' }]}
+                  label="任务负责人"
+                  rules={[{ required: true, message: '请选择任务负责人！' }]}
                 >
-                  <Select placeholder="选择当前处理人">
+                  <Select placeholder="选择任务负责人">
                     {mockUsers.map(user => (
                       <Option key={user} value={user}>{user}</Option>
                     ))}
@@ -1626,8 +1268,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               label="所属项目"
             >
               <Select placeholder="选择所属项目（可选）">
-                {mockProjects.map(project => (
-                  <Option key={project} value={project}>{project}</Option>
+                {(projectsData || []).map(project => (
+                  <Option key={project.id} value={project.name}>{project.name}</Option>
                 ))}
               </Select>
             </Form.Item>
@@ -1724,88 +1366,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         </Modal>
       )}
 
-      {/* Transfer Task Modal */}
-      {selectedTask && (
-        <Modal
-          title={selectedTask.status === 'draft' ? "派发任务" : "任务流转"}
-          visible={isTransferModalVisible}
-          onCancel={handleTransferModalCancel}
-          footer={null}
-        >
-          <Form
-            form={transferForm}
-            layout="vertical"
-            onFinish={handleTransferTask}
-          >
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <Text strong>当前任务: {selectedTask.title}</Text>
-              <br />
-              <Text type="secondary">当前处理人: {selectedTask.currentAssignee}</Text>
-            </div>
-
-            <Form.Item
-              name="toUser"
-              label="选择接收人"
-              rules={[{ required: true, message: '请选择接收人！' }]}
-            >
-              <Select placeholder="选择接收人">
-                {mockUsers.filter(user => user !== selectedTask.currentAssignee).map(user => (
-                  <Option key={user} value={user}>{user}</Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            {/* 只有待办任务才显示完成情况和流转操作 */}
-            {selectedTask.status === 'pending' && (
-              <>
-                <Form.Item
-                  name="notes"
-                  label="完成情况"
-                  rules={[{ required: true, message: '请记录完成情况！' }]}
-                >
-                  <TextArea 
-                    rows={4} 
-                    placeholder="请记录本次处理的内容、遇到的问题、解决方案等..."
-                  />
-                </Form.Item>
-
-                <Form.Item label="流转操作">
-                  <Radio.Group 
-                    value={transferAction} 
-                    onChange={(e) => setTransferAction(e.target.value)}
-                  >
-                    <Space direction="vertical">
-                      <Radio value="transfer">
-                        <Space>
-                          <SendOutlined />
-                          转交下一人 (继续流转)
-                        </Space>
-                      </Radio>
-                      <Radio value="complete">
-                        <Space>
-                          <CheckCircleOutlined />
-                          完成任务 (结束流程)
-                        </Space>
-                      </Radio>
-                    </Space>
-                  </Radio.Group>
-                </Form.Item>
-              </>
-            )}
-
-            <Form.Item>
-              <Space>
-                <Button type="primary" htmlType="submit" icon={<SendOutlined />}>
-                  {selectedTask.status === 'draft' ? '派发任务' : (transferAction === 'transfer' ? '转交任务' : '完成任务')}
-                </Button>
-                <Button onClick={handleTransferModalCancel}>
-                  取消
-                </Button>
-              </Space>
-            </Form.Item>
-          </Form>
-        </Modal>
-      )}
+      {/* 已移除处理任务/流转弹窗 */}
     </div>
   );
 };
