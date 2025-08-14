@@ -186,8 +186,9 @@ class DocumentService:
             row.title = payload.title
         if payload.content is not None:
             row.content = payload.content
-        if payload.project_id is not None:
-            row.project_id = payload.project_id
+        # 修复：允许将 project_id 设置为 None 来清空项目关联
+        if hasattr(payload, 'project_id'):  # 检查字段是否存在
+            row.project_id = payload.project_id  # 可以是 None 或具体值
         if payload.user_ids is not None:
             row.specific_user_ids = payload.user_ids
             

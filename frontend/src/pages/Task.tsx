@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm, Row, Col, Space, Avatar, Divider, Pagination, DatePicker } from 'antd';
+import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm, Row, Col, Space, Avatar, Divider, Pagination, DatePicker, Spin } from 'antd';
 import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, SearchOutlined, CheckCircleFilled, ClockCircleFilled, EditFilled, DownOutlined, RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Task, Subtask, TaskFlow } from '@/types';
@@ -1463,9 +1463,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
           </Card>
 
       {/* 任务列表 */}
-      {renderExpandableTaskList()}
-      {/* 可根据需要显示加载状态 */}
-      {/* {tasksLoading && <div style={{textAlign:'center', marginTop:12}}>加载中...</div>} */}
+      {tasksLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '28px 0' }}>
+          <Spin />
+        </div>
+      ) : (
+        renderExpandableTaskList()
+      )}
 
       {/* 分页组件 */}
       {currentTabTasks.length > 0 && (
@@ -1490,7 +1494,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
       )}
 
       {/* 空状态显示 */}
-      {currentTabTasks.length === 0 && (
+      {!tasksLoading && currentTabTasks.length === 0 && (
         <div className="text-center py-12">
           <div className="text-gray-400 text-lg mb-2">
             {/* 已移除标签页 */}

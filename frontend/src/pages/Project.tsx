@@ -18,6 +18,7 @@ import type {
   CreateProjectData, 
   UpdateProjectData 
 } from '@/types';
+import { Spin } from 'antd';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -524,8 +525,13 @@ const Projects: React.FC = () => {
         </Form>
       </Card>
 
-      <Row gutter={[16, 16]}>
-        {currentProjects.map(project => {
+      {projectsLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '28px 0' }}>
+          <Spin />
+        </div>
+      ) : (
+        <Row gutter={[16, 16]}>
+          {currentProjects.map(project => {
           // 为每个项目生成唯一的颜色
           const projectColor = generateProjectColor(project.id);
           
@@ -618,8 +624,9 @@ const Projects: React.FC = () => {
             </Card>
           </Col>
           );
-        })}
-      </Row>
+          })}
+        </Row>
+      )}
 
       {/* 分页 */}
       <div className="flex justify-center mt-8">
