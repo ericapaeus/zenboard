@@ -2,6 +2,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from models.document import Document
+from models.project_membership import ProjectMembership
 from api.schemas.document import DocumentCreate, DocumentUpdate, DocumentResponse, DocumentWithComments
 from models.document_comment import DocumentComment
 import logging
@@ -48,11 +49,68 @@ class DocumentService:
         try:
             logger.info(f"开始获取文档列表: user_id={user_id}, skip={skip}, limit={limit}, author_id={author_id}, project_id={project_id}, order_by={order_by}")
             
+            # 构建基础查询
             stmt = select(Document)
+            
+            # 应用基础过滤条件
             if author_id is not None:
                 stmt = stmt.where(Document.author_id == author_id)
             if project_id is not None:
                 stmt = stmt.where(Document.project_id == project_id)
+            
+            # 权限控制：直接在SQL层面过滤
+            # 用户可以看到的文档条件：
+            # 1. 文档创建者
+            # 2. 文档中指定的用户
+            # 3. 项目成员（如果文档属于项目）
+            
+            from sqlalchemy import or_, and_
+            
+            # 基础权限条件：创建者或指定用户
+            base_permission = or_(
+                Document.author_id == user_id,  # 文档创建者
+                Document.specific_user_ids.contains(user_id)  # 文档指定用户 - 修复：查找数组是否包含单个用户ID
+            )
+            
+            if project_id is not None:
+                # 如果指定了项目ID，还需要检查项目成员权限
+                project_permission = and_(
+                    Document.project_id == project_id,
+                    Document.id.in_(
+                        select(Document.id).join(
+                            ProjectMembership, 
+                            ProjectMembership.project_id == Document.project_id
+                        ).where(ProjectMembership.user_id == user_id)
+                    )
+                )
+                
+                # 最终权限：基础权限 OR 项目成员权限
+                stmt = stmt.where(or_(base_permission, project_permission))
+                
+                logger.info(f"应用项目权限过滤: project_id={project_id}, user_id={user_id}")
+                
+            else:
+                # 如果没有指定项目ID，检查用户是否有权限访问任何项目文档
+                # 查询用户所在的所有项目
+                user_projects_query = select(ProjectMembership.project_id).where(ProjectMembership.user_id == user_id)
+                user_project_ids = self.db.execute(user_projects_query).scalars().all()
+                
+                if user_project_ids:
+                    # 用户是某些项目的成员，可以访问这些项目的文档
+                    project_permission = Document.id.in_(
+                        select(Document.id).join(
+                            ProjectMembership, 
+                            ProjectMembership.project_id == Document.project_id
+                        ).where(ProjectMembership.user_id == user_id)
+                    )
+                    
+                    # 最终权限：基础权限 OR 项目成员权限
+                    stmt = stmt.where(or_(base_permission, project_permission))
+                    logger.info(f"用户 {user_id} 是项目成员，可以访问项目文档")
+                else:
+                    # 用户不是任何项目的成员，只能看到自己创建的文档和指定给自己的文档
+                    stmt = stmt.where(base_permission)
+                    logger.info(f"用户 {user_id} 不是任何项目成员，只能看到自己的文档")
             
             # 处理排序
             if order_by:
@@ -84,11 +142,10 @@ class DocumentService:
             rows = self.db.execute(stmt).scalars().all()
             logger.info(f"查询结果数量: {len(rows)}")
             
-            # 修复：将SQLAlchemy模型转换为字典，然后创建Pydantic响应模型
+            # 转换结果
             result = []
             for row in rows:
                 try:
-                    # 将SQLAlchemy模型转换为字典
                     doc_dict = {
                         "id": row.id,
                         "title": row.title,

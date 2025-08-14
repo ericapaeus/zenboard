@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm, Row, Col, Space, Avatar, Divider, Pagination, DatePicker } from 'antd';
 import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, SearchOutlined, CheckCircleFilled, ClockCircleFilled, EditFilled, DownOutlined, RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -11,6 +11,21 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 // const { RangePicker } = DatePicker;
+
+// 获取当前用户ID的辅助函数
+const getCurrentUserId = (): number | undefined => {
+  const currentUserInfo = localStorage.getItem('userInfo');
+  if (currentUserInfo) {
+    try {
+      const userInfo = JSON.parse(currentUserInfo);
+      return userInfo.id ? Number(userInfo.id) : undefined;
+    } catch (e) {
+      console.error('解析用户信息失败:', e);
+      return undefined;
+    }
+  }
+  return undefined;
+};
 
 // Markdown normalize so titles/lists render correctly even without space
 function normalizeMarkdown(text: string): string {
@@ -203,6 +218,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
   // Mock data for tasks
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const { data: apiTasks, loading: tasksLoading, refetch: refetchTasks } = useTasks();
 
   // 静态评论数据与输入框状态 - 替换为API调用
@@ -291,11 +307,76 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   React.useEffect(() => {
     if (apiTasks) {
       const mapped = (apiTasks as any[]).map(mapApiTaskToUi);
-      setTasks(mapped);
+      // 按照ID倒序排序，最新创建的任务在上面
+      const sortedTasks = mapped.sort((a, b) => {
+        const aId = parseInt(a.id);
+        const bId = parseInt(b.id);
+        return bId - aId; // 倒序：ID大的在前面
+      });
+      setTasks(sortedTasks);
+      setFilteredTasks(sortedTasks); // 同步更新过滤后的任务
     }
   }, [apiTasks, usersData, projectsData]);
 
-  const mockUsers = (usersData || []).map(u => u.name || `用户${u.id}`);
+  // 监听filteredTasks变化，用于调试
+  React.useEffect(() => {
+    console.log('filteredTasks更新:', filteredTasks.length);
+  }, [filteredTasks]);
+
+  // 设置搜索表单的初始值
+  React.useEffect(() => {
+    if (usersData && usersData.length > 0) {
+      searchForm.setFieldsValue({
+        member: 'all'
+      });
+    }
+  }, [usersData, searchForm]);
+
+  // 检查当前用户是否有权限编辑或删除任务
+  const canUserEditTask = (task: Task): boolean => {
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) return false;
+    
+    // 任务负责人可以编辑和删除
+    if (task.assignee_id === currentUserId) return true;
+    
+    // 任务创建人可以编辑和删除（通过createdBy字段查找用户ID）
+    if (task.createdBy && usersData) {
+      const creatorUser = usersData.find((u: any) => u.name === task.createdBy);
+      if (creatorUser && creatorUser.id === currentUserId) return true;
+    }
+    
+    return false;
+  };
+
+  // 生成所有可能的处理人选项（包括任务负责人和子任务处理人）
+  const getAllAssignees = useMemo(() => {
+    const assignees = new Set<string>();
+    
+    // 添加所有任务负责人
+    tasks.forEach(task => {
+      if (task.currentAssignee) {
+        assignees.add(task.currentAssignee);
+      }
+    });
+    
+    // 添加所有子任务处理人
+    tasks.forEach(task => {
+      task.subtasks.forEach(subtask => {
+        if (subtask.assignee_id) {
+          const assigneeName = getUserName(subtask.assignee_id);
+          if (assigneeName) {
+            assignees.add(assigneeName);
+          }
+        }
+      });
+    });
+    
+    // 转换为数组并排序
+    return Array.from(assignees).sort();
+  }, [tasks, usersData]);
+
+  const mockUsers = getAllAssignees;
   const mockProjects = (projectsData || []).map(p => p.name);
 
   const getPriorityTag = (priority: Task['priority']) => {
@@ -378,7 +459,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     editForm.resetFields();
   };
 
-  // 已删除“处理任务/流转”相关逻辑
+  // 已删除"处理任务/流转"相关逻辑
 
   const handleAddSubtask = (values: any) => {
     if (selectedTask) {
@@ -397,6 +478,91 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
       setTasks(updatedTasks);
       setSelectedTask(prev => prev ? { ...prev, subtasks: [...prev.subtasks, newSubtask] } : null);
       subtaskForm.resetFields();
+      
+      // 子任务添加成功后，尝试创建通知消息（不阻塞流程）
+      try {
+        // 收集所有需要通知的用户ID
+        const recipientIds = new Set<number>();
+        
+        // 1. 子任务处理人
+        if (values.assignee_id) {
+          recipientIds.add(Number(values.assignee_id));
+        }
+        
+        // 2. 主任务负责人（如果与子任务处理人不同）
+        if (selectedTask.assignee_id && selectedTask.assignee_id !== values.assignee_id) {
+          recipientIds.add(Number(selectedTask.assignee_id));
+        }
+        
+        // 3. 项目相关人员（如果有项目）
+        if (selectedTask.project_id) {
+          // 这里可以添加项目成员通知逻辑
+          // 暂时跳过，因为需要额外的项目成员查询
+        }
+        
+        // 4. 任务创建人
+        if (selectedTask.createdBy && usersData) {
+          const creatorUser = usersData.find(u => u.name === selectedTask.createdBy);
+          if (creatorUser) {
+            recipientIds.add(creatorUser.id);
+          }
+        }
+        
+        // 确保有接收者才发送通知
+        if (recipientIds.size > 0) {
+          // 构建详细的消息内容
+          const subtaskAssigneeName = getUserName(values.assignee_id);
+          const mainTaskAssigneeName = getUserName(selectedTask.assignee_id);
+          const projectName = selectedTask.project_id ? getProjectName(String(selectedTask.project_id)) : null;
+          
+          let content = `为任务"${selectedTask.title}"添加了子任务"${values.title}"`;
+          if (subtaskAssigneeName) {
+            content += `，子任务处理人：${subtaskAssigneeName}`;
+          }
+          if (mainTaskAssigneeName && mainTaskAssigneeName !== subtaskAssigneeName) {
+            content += `，主任务负责人：${mainTaskAssigneeName}`;
+          }
+          if (projectName) {
+            content += `，所属项目：${projectName}`;
+          }
+          
+          // 检查是否与现有子任务处理人重复
+          const existingSubtaskWithSameAssignee = selectedTask.subtasks.find(s => 
+            s.assignee_id === values.assignee_id && s.title !== values.title
+          );
+          if (existingSubtaskWithSameAssignee) {
+            content += `，该用户还负责其他子任务`;
+          }
+          
+          createMessage({
+            type: 'task',
+            level: 'info',
+            title: `子任务已添加：${values.title}`,
+            content: content,
+            entity_type: 'task',
+            entity_id: Number(selectedTask.id),
+            actor_id: getCurrentUserId(),
+            data_json: JSON.stringify({
+              action: 'subtask_added',
+              parent_task_id: Number(selectedTask.id),
+              parent_task_title: selectedTask.title,
+              subtask_title: values.title,
+              subtask_content: values.content,
+              subtask_assignee_id: Number(values.assignee_id),
+              subtask_assignee_name: subtaskAssigneeName,
+              main_task_assignee_id: Number(selectedTask.assignee_id),
+              main_task_assignee_name: mainTaskAssigneeName,
+              project_id: selectedTask.project_id,
+              project_name: projectName,
+              existing_subtasks_by_same_assignee: existingSubtaskWithSameAssignee ? [existingSubtaskWithSameAssignee.title] : []
+            }),
+            recipient_user_ids: Array.from(recipientIds)
+          });
+        }
+      } catch (e) {
+        console.error('创建子任务添加通知失败：', e);
+      }
+      
       message.success('子任务添加成功！');
       setShowAddSubtaskForm(false);
     }
@@ -404,6 +570,9 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
   const handleDeleteSubtask = (subtaskId: string) => {
     if (selectedTask) {
+      // 在删除前获取子任务信息用于通知
+      const subtaskToDelete = selectedTask.subtasks.find(sub => sub.id === subtaskId);
+      
       const updatedTasks = tasks.map(task =>
         task.id === selectedTask.id
           ? { ...task, subtasks: task.subtasks.filter(sub => sub.id !== subtaskId) }
@@ -411,6 +580,84 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
       );
       setTasks(updatedTasks);
       setSelectedTask(prev => prev ? { ...prev, subtasks: prev.subtasks.filter(sub => sub.id !== subtaskId) } : null);
+      
+      // 子任务删除成功后，尝试创建通知消息（不阻塞流程）
+      if (subtaskToDelete) {
+        try {
+          // 收集所有需要通知的用户ID
+          const recipientIds = new Set<number>();
+          
+          // 1. 子任务处理人
+          if (subtaskToDelete.assignee_id) {
+            recipientIds.add(Number(subtaskToDelete.assignee_id));
+          }
+          
+          // 2. 主任务负责人（如果与子任务处理人不同）
+          if (selectedTask.assignee_id && selectedTask.assignee_id !== subtaskToDelete.assignee_id) {
+            recipientIds.add(Number(selectedTask.assignee_id));
+          }
+          
+          // 3. 项目相关人员（如果有项目）
+          if (selectedTask.project_id) {
+            // 这里可以添加项目成员通知逻辑
+            // 暂时跳过，因为需要额外的项目成员查询
+          }
+          
+          // 4. 任务创建人
+          if (selectedTask.createdBy && usersData) {
+            const creatorUser = usersData.find(u => u.name === selectedTask.createdBy);
+            if (creatorUser) {
+              recipientIds.add(creatorUser.id);
+            }
+          }
+          
+          // 确保有接收者才发送通知
+          if (recipientIds.size > 0) {
+            // 构建详细的消息内容
+            const subtaskAssigneeName = getUserName(subtaskToDelete.assignee_id);
+            const mainTaskAssigneeName = getUserName(selectedTask.assignee_id);
+            const projectName = selectedTask.project_id ? getProjectName(String(selectedTask.project_id)) : null;
+            
+            let content = `从任务"${selectedTask.title}"中删除了子任务"${subtaskToDelete.title}"`;
+            if (subtaskAssigneeName) {
+              content += `，原子任务处理人：${subtaskAssigneeName}`;
+            }
+            if (mainTaskAssigneeName && mainTaskAssigneeName !== subtaskAssigneeName) {
+              content += `，主任务负责人：${mainTaskAssigneeName}`;
+            }
+            if (projectName) {
+              content += `，所属项目：${projectName}`;
+            }
+            
+            createMessage({
+              type: 'task',
+              level: 'warning',
+              title: `子任务已删除：${subtaskToDelete.title}`,
+              content: content,
+              entity_type: 'task',
+              entity_id: Number(selectedTask.id),
+              actor_id: getCurrentUserId(),
+              data_json: JSON.stringify({
+                action: 'subtask_deleted',
+                parent_task_id: Number(selectedTask.id),
+                parent_task_title: selectedTask.title,
+                subtask_title: subtaskToDelete.title,
+                subtask_content: subtaskToDelete.content,
+                subtask_assignee_id: Number(subtaskToDelete.assignee_id),
+                subtask_assignee_name: subtaskAssigneeName,
+                main_task_assignee_id: Number(selectedTask.assignee_id),
+                main_task_assignee_name: mainTaskAssigneeName,
+                project_id: selectedTask.project_id,
+                project_name: projectName
+              }),
+              recipient_user_ids: Array.from(recipientIds)
+            });
+          }
+        } catch (e) {
+          console.error('创建子任务删除通知失败：', e);
+        }
+      }
+      
       message.success('子任务删除成功！');
     }
   };
@@ -435,6 +682,76 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
       }
       
       const created = await createTask(createData);
+      
+      // 任务创建成功后，尝试创建通知消息（不阻塞流程）
+      try {
+        // 收集所有需要通知的用户ID
+        const recipientIds = new Set<number>();
+        
+        // 1. 任务负责人
+        if (values.assignee_id) {
+          recipientIds.add(Number(values.assignee_id));
+        }
+        
+        // 2. 所有子任务处理人
+        if (values.subtasks && values.subtasks.length > 0) {
+          values.subtasks.forEach((subtask: any) => {
+            if (subtask.assignee_id) {
+              recipientIds.add(Number(subtask.assignee_id));
+            }
+          });
+        }
+        
+        // 3. 任务创建人（当前用户，需要从认证状态获取）
+        const currentUserId = getCurrentUserId();
+        if (currentUserId) {
+          recipientIds.add(currentUserId);
+        }
+        
+        // 确保有接收者才发送通知
+        if (recipientIds.size > 0 && created?.id) {
+          // 构建详细的消息内容
+          const assigneeName = getUserName(values.assignee_id);
+          const projectName = values.project_id ? getProjectName(String(values.project_id)) : null;
+          
+          let content = `任务"${values.title}"已创建`;
+          if (assigneeName) {
+            content += `，负责人：${assigneeName}`;
+          }
+          if (projectName) {
+            content += `，所属项目：${projectName}`;
+          }
+          if (values.subtasks && values.subtasks.length > 0) {
+            content += `，包含${values.subtasks.length}个子任务`;
+          }
+          
+          await createMessage({
+            type: 'task',
+            level: 'info',
+            title: `新任务：${values.title}`,
+            content: content,
+            entity_type: 'task',
+            entity_id: Number(created.id),
+            actor_id: getCurrentUserId(),
+            data_json: JSON.stringify({
+              action: 'created',
+              title: values.title,
+              content: values.content,
+              priority: values.priority,
+              assignee_id: values.assignee_id,
+              assignee_name: assigneeName,
+              project_id: values.project_id || null,
+              project_name: projectName,
+              start_date: values.startDate ? values.startDate.format('YYYY-MM-DD') : null,
+              end_date: values.endDate ? values.endDate.format('YYYY-MM-DD') : null,
+              subtasks: values.subtasks || []
+            }),
+            recipient_user_ids: Array.from(recipientIds)
+          });
+        }
+      } catch (e) {
+        console.error('创建任务通知失败：', e);
+      }
       
       message.success('任务创建成功！');
       handleCreateModalCancel();
@@ -483,6 +800,131 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         // 调用后端API更新任务
         await updateTask(Number(selectedTask.id), processedValues);
         
+        // 任务更新成功后，尝试创建通知消息（不阻塞流程）
+        try {
+          // 收集所有需要通知的用户ID
+          const recipientIds = new Set<number>();
+          
+          // 1. 原任务负责人
+          if (selectedTask.assignee_id) {
+            recipientIds.add(Number(selectedTask.assignee_id));
+          }
+          
+          // 2. 新任务负责人（如果发生变化）
+          if (values.assignee_id && values.assignee_id !== selectedTask.assignee_id) {
+            recipientIds.add(Number(values.assignee_id));
+          }
+          
+          // 3. 所有子任务处理人（包括原有的和新增的）
+          if (processedSubtasks && processedSubtasks.length > 0) {
+            processedSubtasks.forEach((subtask: any) => {
+              if (subtask.assignee_id) {
+                recipientIds.add(Number(subtask.assignee_id));
+              }
+            });
+          }
+          
+          // 4. 原有子任务处理人（如果被移除或修改）
+          if (selectedTask.subtasks && selectedTask.subtasks.length > 0) {
+            selectedTask.subtasks.forEach((subtask: any) => {
+              if (subtask.assignee_id) {
+                recipientIds.add(Number(subtask.assignee_id));
+              }
+            });
+          }
+          
+          // 5. 任务创建人（需要从用户数据中查找）
+          // 这里需要根据创建者姓名查找用户ID
+          if (selectedTask.createdBy && usersData) {
+            const creatorUser = usersData.find(u => u.name === selectedTask.createdBy);
+            if (creatorUser) {
+              recipientIds.add(creatorUser.id);
+            }
+          }
+          
+          // 确保有接收者才发送通知
+          if (recipientIds.size > 0) {
+            // 构建详细的消息内容
+            const oldAssigneeName = getUserName(selectedTask.assignee_id);
+            const newAssigneeName = getUserName(values.assignee_id);
+            const projectName = values.project_id ? getProjectName(String(values.project_id)) : null;
+            
+            let content = `任务"${values.title}"已更新`;
+            
+            // 负责人变化信息
+            if (oldAssigneeName && newAssigneeName && oldAssigneeName !== newAssigneeName) {
+              content += `，负责人从"${oldAssigneeName}"变更为"${newAssigneeName}"`;
+            } else if (newAssigneeName) {
+              content += `，负责人：${newAssigneeName}`;
+            }
+            
+            // 项目信息
+            if (projectName) {
+              content += `，所属项目：${projectName}`;
+            }
+            
+            // 子任务变化信息
+            let subtaskChanges: string[] = [];
+            if (processedSubtasks && processedSubtasks.length > 0) {
+              const oldSubtasksCount = selectedTask.subtasks.length;
+              const newSubtasksCount = processedSubtasks.length;
+              
+              if (newSubtasksCount > oldSubtasksCount) {
+                content += `，新增${newSubtasksCount - oldSubtasksCount}个子任务`;
+              } else if (newSubtasksCount < oldSubtasksCount) {
+                content += `，移除${oldSubtasksCount - newSubtasksCount}个子任务`;
+              } else {
+                content += `，包含${newSubtasksCount}个子任务`;
+              }
+              
+              // 检测子任务处理人变化
+              processedSubtasks.forEach((newSubtask: any) => {
+                const oldSubtask = selectedTask.subtasks.find(s => s.title === newSubtask.title);
+                if (oldSubtask && oldSubtask.assignee_id !== newSubtask.assignee_id) {
+                  const oldSubtaskAssignee = getUserName(oldSubtask.assignee_id);
+                  const newSubtaskAssignee = getUserName(newSubtask.assignee_id);
+                  if (oldSubtaskAssignee && newSubtaskAssignee) {
+                    subtaskChanges.push(`子任务"${newSubtask.title}"处理人从"${oldSubtaskAssignee}"变更为"${newSubtaskAssignee}"`);
+                  }
+                }
+              });
+              
+              if (subtaskChanges.length > 0) {
+                content += `，${subtaskChanges.join('，')}`;
+              }
+            }
+            
+            await createMessage({
+              type: 'task',
+              level: 'info',
+              title: `任务已更新：${values.title}`,
+              content: content,
+              entity_type: 'task',
+              entity_id: Number(selectedTask.id),
+              actor_id: getCurrentUserId(),
+              data_json: JSON.stringify({
+                action: 'updated',
+                title: values.title,
+                content: values.content,
+                priority: values.priority,
+                old_assignee_id: selectedTask.assignee_id,
+                old_assignee_name: oldAssigneeName,
+                new_assignee_id: values.assignee_id,
+                new_assignee_name: newAssigneeName,
+                project_id: values.project_id || null,
+                project_name: projectName,
+                start_date: values.startDate ? values.startDate.format('YYYY-MM-DD') : null,
+                end_date: values.endDate ? values.endDate.format('YYYY-MM-DD') : null,
+                subtasks: processedSubtasks,
+                subtask_changes: subtaskChanges
+              }),
+              recipient_user_ids: Array.from(recipientIds)
+            });
+          }
+        } catch (e) {
+          console.error('创建任务更新通知失败：', e);
+        }
+        
         // 刷新任务列表
         refetchTasks();
         
@@ -500,7 +942,82 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
   const handleDeleteTask = async (taskId: string) => {
     try {
+      // 在删除前获取任务信息用于通知
+      const taskToDelete = tasks.find(t => t.id === taskId);
+      
       await deleteTask(Number(taskId));
+      
+      // 任务删除成功后，尝试创建通知消息（不阻塞流程）
+      if (taskToDelete) {
+        try {
+          // 收集所有需要通知的用户ID
+          const recipientIds = new Set<number>();
+          
+          // 1. 任务负责人
+          if (taskToDelete.assignee_id) {
+            recipientIds.add(Number(taskToDelete.assignee_id));
+          }
+          
+          // 2. 所有子任务处理人
+          if (taskToDelete.subtasks && taskToDelete.subtasks.length > 0) {
+            taskToDelete.subtasks.forEach((subtask: any) => {
+              if (subtask.assignee_id) {
+                recipientIds.add(Number(subtask.assignee_id));
+              }
+            });
+          }
+
+          // 3. 任务创建人
+          if (taskToDelete.createdBy && usersData) {
+            const creatorUser = usersData.find(u => u.name === taskToDelete.createdBy);
+            if (creatorUser) {
+              recipientIds.add(creatorUser.id);
+            }
+          }
+          
+          // 确保有接收者才发送通知
+          if (recipientIds.size > 0) {
+            // 构建详细的消息内容
+            const assigneeName = getUserName(taskToDelete.assignee_id);
+            const projectName = taskToDelete.project_id ? getProjectName(String(taskToDelete.project_id)) : null;
+            
+            let content = `任务"${taskToDelete.title}"已被删除`;
+            if (assigneeName) {
+              content += `，原负责人：${assigneeName}`;
+            }
+            if (projectName) {
+              content += `，所属项目：${projectName}`;
+            }
+            if (taskToDelete.subtasks && taskToDelete.subtasks.length > 0) {
+              content += `，包含${taskToDelete.subtasks.length}个子任务`;
+            }
+            
+            await createMessage({
+              type: 'task',
+              level: 'warning',
+              title: `任务已删除：${taskToDelete.title}`,
+              content: content,
+              entity_type: 'task',
+              entity_id: Number(taskId),
+              actor_id: getCurrentUserId(),
+              data_json: JSON.stringify({
+                action: 'deleted',
+                title: taskToDelete.title,
+                content: taskToDelete.content,
+                priority: taskToDelete.priority,
+                assignee_id: taskToDelete.assignee_id,
+                assignee_name: assigneeName,
+                project_id: taskToDelete.project_id,
+                project_name: projectName
+              }),
+              recipient_user_ids: Array.from(recipientIds)
+            });
+          }
+        } catch (e) {
+          console.error('创建任务删除通知失败：', e);
+        }
+      }
+      
       message.success('任务删除成功！');
       handleDetailsModalCancel();
       refetchTasks();
@@ -511,6 +1028,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
   // 搜索和筛选功能
   const handleSearch = (values: any) => {
+    console.log('搜索参数:', values); // 调试信息
     let filtered = [...tasks];
     
     // 关键词搜索
@@ -520,25 +1038,47 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         task.title.toLowerCase().includes(keyword) ||
         task.content.toLowerCase().includes(keyword) ||
         task.currentAssignee.toLowerCase().includes(keyword) ||
-        task.project?.toLowerCase().includes(keyword)
+        task.project?.toLowerCase().includes(keyword) ||
+        // 添加子任务标题和内容的搜索
+        task.subtasks.some(subtask => 
+          subtask.title.toLowerCase().includes(keyword) ||
+          subtask.content.toLowerCase().includes(keyword)
+        )
       );
     }
     
-    // 成员筛选
+    // 成员筛选 - 同时搜索任务负责人和子任务处理人
     if (values.member && values.member !== 'all') {
-      filtered = filtered.filter(task => 
-        task.currentAssignee === values.member
-      );
+      console.log('按成员筛选:', values.member); // 调试信息
+      console.log('当前所有任务负责人:', tasks.map(t => t.currentAssignee)); // 调试信息
+      filtered = filtered.filter(task => {
+        // 检查任务负责人是否匹配
+        const mainTaskMatches = task.currentAssignee === values.member;
+        
+        // 检查子任务处理人是否匹配
+        const subtaskMatches = task.subtasks.some(subtask => {
+          const subtaskAssigneeName = getUserName(subtask.assignee_id);
+          return subtaskAssigneeName === values.member;
+        });
+        
+        const matches = mainTaskMatches || subtaskMatches;
+        console.log(`任务"${task.title}"负责人: ${task.currentAssignee}, 子任务处理人: ${task.subtasks.map(s => getUserName(s.assignee_id)).join(', ')}, 匹配: ${matches}`); // 调试信息
+        return matches;
+      });
     }
     
-    // setFilteredTasks(filtered); // This line was removed from the new_code, so it's removed here.
+    console.log('过滤前任务数量:', tasks.length); // 调试信息
+    console.log('过滤后任务数量:', filtered.length); // 调试信息
+    
+    // 应用过滤结果
+    setFilteredTasks(filtered);
     setCurrentPage(1);
   };
 
   // 重置搜索
   const handleReset = () => {
     searchForm.resetFields();
-    // setFilteredTasks(tasks); // This line was removed from the new_code, so it's removed here.
+    setFilteredTasks(tasks);
     setCurrentPage(1);
   };
 
@@ -555,7 +1095,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
   // 过滤和分页逻辑
   const getCurrentTabTasks = () => {
-    return tasks;
+    return filteredTasks.length > 0 ? filteredTasks : tasks;
   };
 
   const currentTabTasks = getCurrentTabTasks();
@@ -572,14 +1112,15 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         hoverable
         className="h-full shadow-sm"
         style={{ borderTop: `4px solid ${task.priority === 'high' ? '#ff4d4f' : task.priority === 'medium' ? '#faad14' : '#52c41a'}` }}
-        actions={[
+        actions={
+          canUserEditTask(task) ? [
             <Button
-            key="edit"
+              key="edit"
               type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEditModalOpen(task)}
+              icon={<EditOutlined />}
+              onClick={() => handleEditModalOpen(task)}
             >
-            编辑
+              编辑
             </Button>,
             <Popconfirm
               key="delete"
@@ -596,7 +1137,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                 删除
               </Button>
             </Popconfirm>
-        ]}
+          ] : []
+        }
       >
         <div className="mb-4">
           <div className="flex justify-between items-start mb-2">
@@ -665,9 +1207,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             padding: '20px'
           }}
-          actions={[
+          actions={
+            canUserEditTask(task) ? [
               <Button
-              key="edit"
+                key="edit"
                 type="link"
                 icon={<EditOutlined />}
                 onClick={() => handleEditModalOpen(task)}
@@ -689,7 +1232,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                   删除
                 </Button>
               </Popconfirm>
-          ]}
+            ] : []
+          }
         >
           {/* 任务基本信息 */}
           <div className="task-basic-info mb-4">
@@ -857,6 +1401,11 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     <div className="p-6">
           {/* 搜索区域 */}
           <Card className="mb-6 shadow-sm">
+            <div className="mb-4">
+              <Text type="secondary" className="text-sm">
+                💡 搜索提示：关键词搜索包含任务标题、内容、处理人、项目名称和子任务信息；处理人筛选包含任务负责人和子任务处理人
+              </Text>
+            </div>
             <Form
               form={searchForm}
               layout="inline"
@@ -875,7 +1424,15 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                 </Col>
                 <Col xs={24} sm={12} md={8} lg={6}>
                   <Form.Item name="member" className="w-full mb-0">
-                    <Select placeholder="选择处理人" allowClear>
+                    <Select 
+                      placeholder="选择处理人（包含任务负责人和子任务处理人）" 
+                      allowClear
+                      onChange={(value) => console.log('搜索表单处理人选择变化:', value)}
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase())
+                      }
+                    >
                       <Option value="all">全部成员</Option>
                       {mockUsers.map(user => (
                         <Option key={user} value={user}>{user}</Option>
@@ -1118,7 +1675,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                               label="处理人"
                               rules={[{ required: true, message: '请选择子任务处理人！' }]}
                             >
-                              <Select placeholder="选择处理人">
+                              <Select placeholder="选择处理人" onChange={(value) => console.log('处理人选择变化:', value)}>
                                 {(usersData || []).map(user => (
                                   <Option key={user.id} value={user.id}>{user.name || `用户${user.id}`}</Option>
                                 ))}
@@ -1309,7 +1866,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                                 label="处理人"
                                 rules={[{ required: true, message: '请选择子任务处理人！' }]}
                               >
-                                <Select placeholder="选择处理人">
+                                <Select placeholder="选择处理人" onChange={(value) => console.log('处理人选择变化:', value)}>
                                 {(usersData || []).map(user => (
                                   <Option key={user.id} value={user.id}>{user.name || `用户${user.id}`}</Option>
                                   ))}
@@ -1515,7 +2072,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                                 label="处理人"
                                 rules={[{ required: true, message: '请选择子任务处理人！' }]}
                               >
-                                <Select placeholder="选择处理人">
+                                <Select placeholder="选择处理人" onChange={(value) => console.log('处理人选择变化:', value)}>
                                   {(usersData || []).map(user => (
                                     <Option key={user.id} value={user.id}>{user.name || `用户${user.id}`}</Option>
                                   ))}

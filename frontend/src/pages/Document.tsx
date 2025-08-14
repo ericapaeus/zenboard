@@ -43,6 +43,21 @@ import type {
   UpdateDocumentData 
 } from '@/types';
 
+// 获取当前用户ID的辅助函数
+const getCurrentUserId = (): number | undefined => {
+  const currentUserInfo = localStorage.getItem('userInfo');
+  if (currentUserInfo) {
+    try {
+      const userInfo = JSON.parse(currentUserInfo);
+      return userInfo.id ? Number(userInfo.id) : undefined;
+    } catch (e) {
+      console.error('解析用户信息失败:', e);
+      return undefined;
+    }
+  }
+  return undefined;
+};
+
 // Markdown normalize so titles/lists render correctly even without space
 function normalizeMarkdown(text: string): string {
   const normalized = (text || '').replace(/\r\n/g, '\n');
@@ -75,6 +90,7 @@ interface DiaryEntry {
   members?: number[]; // 指定用户ID
   status: 'draft' | 'submitted';
   comments?: DocumentComment[];
+  creator_id?: number; // 文档创建者ID
 }
 
 const DocumentPage: React.FC = () => {
@@ -175,10 +191,45 @@ const DocumentPage: React.FC = () => {
     date: dayjs(doc.created_at).format('YYYY-MM-DD HH:mm:ss'), // 格式化时间
     status: 'submitted',
     comments: [],
-    project_id: anyDoc.project_id,
+    project_id: anyDoc.project_id ? Number(anyDoc.project_id) : undefined, // 确保是数字类型
     members: anyDoc.specific_user_ids || anyDoc.user_ids || [],
+    creator_id: anyDoc.author_id ? Number(anyDoc.author_id) : undefined, // 使用 author_id 作为创建者ID
   };
 }
+
+  // 检查当前用户是否有权限编辑或删除文档
+  const canUserEditDocument = (document: DiaryEntry): boolean => {
+    const currentUserId = getCurrentUserId();
+    console.log('权限检查调试信息:', {
+      currentUserId,
+      documentCreatorId: document.creator_id,
+      documentTitle: document.title,
+      usersData: usersData?.length
+    });
+    
+    if (!currentUserId) {
+      console.log('当前用户ID不存在');
+      return false;
+    }
+    
+    // 文档创建者可以编辑和删除
+    if (document.creator_id === currentUserId) {
+      console.log('用户是文档创建者，允许编辑');
+      return true;
+    }
+    
+    // 如果文档有创建者信息，通过author_id字段查找用户ID
+    if (document.creator_id && usersData) {
+      const creatorUser = usersData.find((u: any) => u.id === document.creator_id);
+      if (creatorUser && creatorUser.id === currentUserId) {
+        console.log('通过用户数据找到创建者，允许编辑');
+        return true;
+      }
+    }
+    
+    console.log('用户无权限编辑此文档');
+    return false;
+  };
 
   // 加载文档列表
   const loadDocuments = useCallback(async (page = currentPage, size = pageSize) => {
@@ -411,15 +462,27 @@ const DocumentPage: React.FC = () => {
   }, [form]);
 
   const handleEditDiary = useCallback((item: DiaryEntry) => {
+  console.log('编辑文档 - 原始数据:', {
+    item,
+    project_id: item.project_id,
+    project_id_type: typeof item.project_id,
+    user_ids: item.members
+  });
+  
   setIsModalOpen(true);
   setEditingDraftId(item.id);
   setEditingForDiaries(true);
-  form.setFieldsValue({ 
-  title: item.title, 
-  content: item.content, 
-  project_id: item.project_id,
+  
+  const formValues = {
+    title: item.title, 
+    content: item.content, 
+    project_id: item.project_id,
     user_ids: item.members || []
-  });
+  };
+  
+  console.log('编辑文档 - 设置表单值:', formValues);
+  
+  form.setFieldsValue(formValues);
 }, [form]);
 
   const handleDeleteDiary = useCallback((item: DiaryEntry) => {
@@ -519,7 +582,7 @@ const DocumentPage: React.FC = () => {
       setDeleteConfirmModalOpen(false);
       setDeleteTargetItem(null);
 
-      console.log('🔄 删除完成，列表刷新调用完毕');
+      console.log('�� 删除完成，列表刷新调用完毕');
 
     } catch (error: any) {
       console.error('💥 删除过程中发生错误', {
@@ -558,7 +621,7 @@ const DocumentPage: React.FC = () => {
     if (!projectsData) return [];
     return projectsData.map(project => ({
       label: project.name,
-      value: project.id
+      value: Number(project.id) // 确保value是数字类型
     }));
   }, [projectsData]);
 
@@ -656,16 +719,20 @@ const DocumentPage: React.FC = () => {
                       <Text type="secondary" style={{ fontSize: 12 }}>{item.date}</Text>
                     </div>
                     <Space>
-                      <Button type="link" onClick={() => handleEditDiary(item)}>编辑</Button>
-                      <Button type="link" danger onClick={() => {
-                        console.log('🖱️ 删除按钮被点击', {
-                          item: item,
-                          itemId: item.id,
-                          itemTitle: item.title,
-                          timestamp: new Date().toISOString()
-                        });
-                        handleDeleteDiary(item);
-                      }}>删除</Button>
+                      {canUserEditDocument(item) && (
+                        <>
+                          <Button type="link" onClick={() => handleEditDiary(item)}>编辑</Button>
+                          <Button type="link" danger onClick={() => {
+                            console.log('🖱️ 删除按钮被点击', {
+                              item: item,
+                              itemId: item.id,
+                              itemTitle: item.title,
+                              timestamp: new Date().toISOString()
+                            });
+                            handleDeleteDiary(item);
+                          }}>删除</Button>
+                        </>
+                      )}
                       <Button type="link" onClick={() => toggleExpand(item.id)}>{expanded ? '收起' : '展开'}</Button>
                     </Space>
                   </div>
@@ -796,6 +863,11 @@ const DocumentPage: React.FC = () => {
               options={projectOptions}
               loading={projectsLoading}
               allowClear
+              onChange={(value) => console.log('项目选择变化:', value, '类型:', typeof value)}
+              onFocus={() => {
+                const currentValue = form.getFieldValue('project_id');
+                console.log('项目选择器获得焦点，当前值:', currentValue, '类型:', typeof currentValue);
+              }}
             />
           </Form.Item>
           
@@ -806,6 +878,7 @@ const DocumentPage: React.FC = () => {
               options={userOptions}
               loading={usersLoading}
               allowClear
+              onChange={(value) => console.log('用户选择变化:', value)}
             />
           </Form.Item>
           

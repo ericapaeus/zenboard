@@ -23,8 +23,10 @@ class ProjectResponse(BaseModel):
     updated_at: str
     user_ids: List[int] = []  # 添加成员ID列表
     member_count: int = 0      # 添加成员数量
+    task_count: int = 0        # 添加任务数量
+    subtask_count: int = 0     # 添加子任务数量
 
 class ProjectWithMembers(ProjectResponse):
     user_ids: List[int]
     task_count: int = 0
-    completed_task_count: int = 0 
+    subtask_count: int = 0 

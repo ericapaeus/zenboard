@@ -81,6 +81,16 @@ class TaskService:
                 if isinstance(subtask, dict) and subtask.get('assignee_id') == user_id:
                     return True
         
+        # 项目成员也可以看到该任务
+        if task.project_id:
+            from models.project_membership import ProjectMembership
+            project_member = self.db.query(ProjectMembership).filter(
+                ProjectMembership.project_id == task.project_id,
+                ProjectMembership.user_id == user_id
+            ).first()
+            if project_member:
+                return True
+        
         return False
 
     async def create_task(self, task: TaskCreate, creator_id: int) -> TaskResponse:
@@ -132,30 +142,45 @@ class TaskService:
         if project_id is not None:
             query = query.filter(Task.project_id == project_id)
         
-        # 基础权限过滤：用户只能看到自己创建的任务、分配给自己的任务
-        query = query.filter(
-            (Task.creator_id == user_id) |  # 自己创建的任务
-            (Task.assignee_id == user_id)   # 分配给自己的任务
-        )
+        # 获取所有任务，然后在Python层面进行权限过滤
+        all_tasks = query.offset(skip).limit(limit).all()
         
-        if assignee_id is not None:
-            query = query.filter(Task.assignee_id == assignee_id)
-        
-        # 获取基础任务列表
-        base_tasks = query.offset(skip).limit(limit).all()
-        
-        # 在Python层面检查子任务权限
+        # 权限过滤：用户可以看到以下任务
         accessible_tasks = []
-        for task in base_tasks:
-            # 如果用户有基础权限，直接添加
-            if task.creator_id == user_id or task.assignee_id == user_id:
+        for task in all_tasks:
+            # 1. 自己创建的任务
+            if task.creator_id == user_id:
                 accessible_tasks.append(task)
-            # 否则检查子任务权限
-            elif task.subtasks:
+                continue
+            
+            # 2. 分配给自己的任务
+            if task.assignee_id == user_id:
+                accessible_tasks.append(task)
+                continue
+            
+            # 3. 子任务处理人是自己的任务
+            if task.subtasks:
                 for subtask in task.subtasks:
                     if isinstance(subtask, dict) and subtask.get('assignee_id') == user_id:
                         accessible_tasks.append(task)
                         break
+                continue
+            
+            # 4. 任务所属项目的成员也可以看到该任务
+            if task.project_id:
+                # 检查用户是否是项目成员
+                from models.project_membership import ProjectMembership
+                project_member = self.db.query(ProjectMembership).filter(
+                    ProjectMembership.project_id == task.project_id,
+                    ProjectMembership.user_id == user_id
+                ).first()
+                if project_member:
+                    accessible_tasks.append(task)
+                    continue
+        
+        # 如果指定了assignee_id，进一步过滤
+        if assignee_id is not None:
+            accessible_tasks = [t for t in accessible_tasks if t.assignee_id == assignee_id]
         
         return [self._to_task_response(t) for t in accessible_tasks]
 

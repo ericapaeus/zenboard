@@ -1,7 +1,6 @@
 import React from 'react';
 import { Card, Typography, Button, Modal, Form, Input, Select, Avatar, Tag, Space, Row, Col, Statistic, Pagination, Dropdown, message } from 'antd';
 import { PlusOutlined, UserOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, SearchOutlined, MoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import { generateProjectColor } from '@/utils/colorGenerator';
 // 导入 API hooks
 import { 
@@ -23,8 +22,22 @@ import type {
 const { Title, Text } = Typography;
 const { Option } = Select;
 
+// 获取当前用户ID的辅助函数
+const getCurrentUserId = (): number | undefined => {
+  const currentUserInfo = localStorage.getItem('userInfo');
+  if (currentUserInfo) {
+    try {
+      const userInfo = JSON.parse(currentUserInfo);
+      return userInfo.id ? Number(userInfo.id) : undefined;
+    } catch (e) {
+      console.error('解析用户信息失败:', e);
+      return undefined;
+    }
+  }
+  return undefined;
+};
+
 const Projects: React.FC = () => {
-  const navigate = useNavigate();
   const [isCreateModalVisible, setIsCreateModalVisible] = React.useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = React.useState(false);
   const [createForm] = Form.useForm();
@@ -34,6 +47,16 @@ const Projects: React.FC = () => {
   const [pageSize, setPageSize] = React.useState(8);
   const [filteredProjects, setFilteredProjects] = React.useState<ProjectWithMembers[]>([]);
   const [selectedProject, setSelectedProject] = React.useState<ProjectWithMembers | null>(null);
+
+  // 调试：输出当前用户信息
+  React.useEffect(() => {
+    const currentUserId = getCurrentUserId();
+    const userInfo = localStorage.getItem('userInfo');
+    console.log('当前用户信息:', {
+      currentUserId,
+      userInfo: userInfo ? JSON.parse(userInfo) : null
+    });
+  }, []);
 
   // 使用 API hooks 获取数据
   const { data: projectsData, loading: projectsLoading, refetch: refetchProjects } = useProjects();
@@ -46,18 +69,32 @@ const Projects: React.FC = () => {
   // 转换后端数据为前端格式
   const projects = React.useMemo(() => {
     if (!projectsData) return [];
-    return projectsData.map((project: any) => ({
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      status: project.status || 'active',
-      created_by: project.created_by,
-      created_at: project.created_at,
-      updated_at: project.updated_at,
-      user_ids: project.user_ids || [],
-      task_count: project.task_count || 0,
-      completed_task_count: project.completed_task_count || 0
-    }));
+    
+    console.log('原始项目数据:', projectsData);
+    
+    return projectsData.map((project: any) => {
+      console.log('处理项目:', {
+        id: project.id,
+        name: project.name,
+        created_by: project.created_by,
+        created_by_id: project.created_by_id
+      });
+      
+      return {
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        status: project.status || 'active',
+        created_by: project.created_by,
+        created_at: project.created_at,
+        updated_at: project.updated_at,
+        user_ids: project.user_ids || [],
+        task_count: project.task_count || 0,
+        subtask_count: project.subtask_count || 0,
+        // 修复：使用 created_by 作为创建者ID
+        creator_id: project.created_by ? Number(project.created_by) : undefined
+      };
+    });
   }, [projectsData]);
 
   // 从 API 获取用户选项
@@ -68,6 +105,46 @@ const Projects: React.FC = () => {
       value: user.id
     }));
   }, [usersData]);
+
+  // 检查当前用户是否有权限编辑或删除项目
+  const canUserEditProject = (project: ProjectWithMembers): boolean => {
+    const currentUserId = getCurrentUserId();
+    console.log('项目权限检查调试信息:', {
+      currentUserId,
+      projectCreatorId: project.creator_id,
+      projectCreatedBy: project.created_by,
+      projectName: project.name,
+      usersData: usersData?.length
+    });
+    
+    if (!currentUserId) {
+      console.log('当前用户ID不存在');
+      return false;
+    }
+    
+    // 项目创建者可以编辑和删除 - 直接比较ID
+    if (project.creator_id === currentUserId) {
+      console.log('用户是项目创建者，允许编辑');
+      return true;
+    }
+    
+    // 如果项目有创建者信息，通过created_by字段查找用户ID
+    if (project.created_by && usersData) {
+      const creatorUser = usersData.find((u: any) => u.name === project.created_by);
+      console.log('查找创建者用户:', {
+        createdBy: project.created_by,
+        foundUser: creatorUser,
+        creatorUserId: creatorUser?.id
+      });
+      if (creatorUser && creatorUser.id === currentUserId) {
+        console.log('通过用户数据找到创建者，允许编辑');
+        return true;
+      }
+    }
+    
+    console.log('用户无权限编辑此项目');
+    return false;
+  };
 
   // 搜索和筛选功能
   const handleSearch = (values: any) => {
@@ -104,10 +181,6 @@ const Projects: React.FC = () => {
   React.useEffect(() => {
     setFilteredProjects(projects);
   }, [projects]);
-
-  const handleViewProjectDetails = (projectId: string, projectName: string) => {
-    navigate(`/projects/${projectId}`);
-  };
 
   const handleCreateModalOpen = () => {
     setIsCreateModalVisible(true);
@@ -353,13 +426,12 @@ const Projects: React.FC = () => {
 
   // 获取项目操作菜单
   const getProjectActions = (project: ProjectWithMembers) => {
+    // 检查用户权限
+    if (!canUserEditProject(project)) {
+      return []; // 没有权限的用户返回空数组
+    }
+
     const items = [
-      {
-        key: 'view',
-        label: '查看详情',
-        icon: <TeamOutlined />,
-        onClick: () => handleViewProjectDetails(project.id, project.name),
-      },
       {
         key: 'edit',
         label: '编辑项目',
@@ -457,13 +529,25 @@ const Projects: React.FC = () => {
           // 为每个项目生成唯一的颜色
           const projectColor = generateProjectColor(project.id);
           
+          // 调试：检查权限
+          const hasEditPermission = canUserEditProject(project);
+          console.log(`项目"${project.name}"权限检查:`, {
+            projectId: project.id,
+            projectName: project.name,
+            hasEditPermission,
+            creatorId: project.creator_id,
+            createdBy: project.created_by
+          });
+          
           return (
           <Col xs={24} sm={12} lg={8} xl={6} key={project.id}>
             <Card
               hoverable
               className="h-full"
                 style={{ borderTop: `4px solid ${projectColor}` }}
-              actions={[
+              actions={
+                // 只有项目创建者才能看到操作栏
+                canUserEditProject(project) ? [
                   <Dropdown
                     key="actions"
                     menu={{ items: getProjectActions(project) }}
@@ -472,7 +556,8 @@ const Projects: React.FC = () => {
                   >
                     <Button type="text" icon={<MoreOutlined />} />
                   </Dropdown>
-              ]}
+                ] : []
+              }
             >
               <div className="mb-4">
                   <div className="flex justify-between items-start mb-2">
@@ -499,30 +584,13 @@ const Projects: React.FC = () => {
                   </Col>
                   <Col span={12}>
                     <Statistic
-                      title="已完成"
-                      value={project.completed_task_count || 0}
+                      title="子任务数"
+                      value={project.subtask_count || 0}
                       prefix={<CheckCircleOutlined />}
                       valueStyle={{ fontSize: '16px', color: '#52c41a' }}
                     />
                   </Col>
                 </Row>
-                {(project.task_count || 0) > 0 && (
-                  <div className="mt-2">
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>进度</span>
-                      <span>{Math.round(((project.completed_task_count || 0) / (project.task_count || 1)) * 100)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="h-2 rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${((project.completed_task_count || 0) / (project.task_count || 1)) * 100}%`,
-                            backgroundColor: projectColor
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* 成员列表 */}

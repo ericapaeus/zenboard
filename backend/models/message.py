@@ -47,7 +47,7 @@ class MessageRecipient(Base):
 
     message_id = Column(
         Integer,
-        ForeignKey("message.id", ondelete="CASCADE"),
+        ForeignKey("message.id", name="fk_message_recipient_message", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="消息ID",

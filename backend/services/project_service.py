@@ -1,10 +1,11 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from datetime import datetime
 from api.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectWithMembers
 from models.project import Project
 from models.project_membership import ProjectMembership
+from models.task import Task
 from models.user import User
 import logging
 
@@ -13,6 +14,30 @@ logger = logging.getLogger(__name__)
 class ProjectService:
     def __init__(self, db: Session):
         self.db = db
+
+    def _get_project_task_stats(self, project_id: int) -> tuple[int, int]:
+        """获取项目的任务统计信息"""
+        try:
+            # 统计总任务数
+            task_count = self.db.query(func.count(Task.id)).filter(
+                Task.project_id == project_id
+            ).scalar() or 0
+            
+            # 统计子任务总数（从所有任务的subtasks JSON字段中统计）
+            subtask_count = 0
+            tasks = self.db.query(Task.subtasks).filter(
+                Task.project_id == project_id,
+                Task.subtasks.isnot(None)
+            ).all()
+            
+            for task in tasks:
+                if task.subtasks and isinstance(task.subtasks, list):
+                    subtask_count += len(task.subtasks)
+            
+            return task_count, subtask_count
+        except Exception as e:
+            logger.error(f"获取项目任务统计失败: {str(e)}")
+            return 0, 0
 
     async def create_project(self, project: ProjectCreate, creator_id: int) -> ProjectResponse:
         """创建项目"""
@@ -100,6 +125,9 @@ class ProjectService:
                 ).all()
                 user_ids = [member.user_id for member in members]
                 
+                # 获取任务统计信息
+                task_count, subtask_count = self._get_project_task_stats(project.id)
+                
                 result.append(ProjectResponse(
                     id=str(project.id),
                     name=project.name,
@@ -109,7 +137,9 @@ class ProjectService:
                     created_at=project.created_at.isoformat(),
                     updated_at=project.updated_at.isoformat(),
                     user_ids=user_ids,
-                    member_count=len(user_ids)
+                    member_count=len(user_ids),
+                    task_count=task_count,
+                    subtask_count=subtask_count
                 ))
             
             return result
@@ -144,6 +174,9 @@ class ProjectService:
             
             user_ids = [member.user_id for member in members]
             
+            # 获取任务统计信息
+            task_count, subtask_count = self._get_project_task_stats(project_id)
+            
             return ProjectWithMembers(
                 id=str(project.id),
                 name=project.name,
@@ -153,8 +186,8 @@ class ProjectService:
                 created_at=project.created_at.isoformat(),
                 updated_at=project.updated_at.isoformat(),
                 user_ids=user_ids,
-                task_count=0,
-                completed_task_count=0
+                task_count=task_count,
+                subtask_count=subtask_count
             )
             
         except Exception as e:

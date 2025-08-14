@@ -340,20 +340,11 @@ async def get_users(
     current_user: User = Depends(get_current_user)
 ):
     """
-    获取用户列表，只有管理员可以访问
+    获取用户列表，所有认证用户都可以访问，只返回已通过的用户
     """
     try:
-        # 检查当前用户是否为管理员
-        if current_user.role != "管理员":
-            return ApiResponse(
-                success=False,
-                message="权限不足，只有管理员可以查看用户列表",
-                data=None,
-                code=403
-            )
-        
-        # 查询所有用户
-        users = db.query(User).order_by(User.id.desc()).all()
+        # 查询所有状态为"已通过"的用户
+        users = db.query(User).filter(User.status == "已通过").order_by(User.id.desc()).all()
         
         # 转换为响应格式
         user_list = []
@@ -382,7 +373,7 @@ async def get_users(
         logger.error(f"获取用户列表失败: {e}")
         return ApiResponse(
             success=False,
-            message=f"获取用户列表失败: {e}",
+            message="获取用户列表失败",
             data=None,
             code=500
         )

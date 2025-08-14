@@ -31,7 +31,8 @@ export interface Project {
 export interface ProjectWithMembers extends Project {
   user_ids?: number[];
   task_count?: number;
-  completed_task_count?: number;
+  subtask_count?: number;
+  creator_id?: number; // 项目创建者ID
 }
 
 // 项目操作相关类型

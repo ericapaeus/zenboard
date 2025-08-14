@@ -24,9 +24,9 @@ class Task(Base):
     subtasks = Column(JSON, nullable=True, comment="子任务数据，JSON格式存储")
     
     # 外键
-    project_id = Column(Integer, ForeignKey("project.id"), nullable=True, comment="所属项目ID")
-    creator_id = Column(Integer, ForeignKey("user.id"), nullable=False, comment="创建者用户ID")
-    assignee_id = Column(Integer, ForeignKey("user.id"), nullable=True, comment="任务负责人ID")
+    project_id = Column(Integer, ForeignKey("project.id", name="fk_task_project_id"), nullable=True, comment="所属项目ID")
+    creator_id = Column(Integer, ForeignKey("user.id", name="fk_task_creator_id"), nullable=False, comment="创建者用户ID")
+    assignee_id = Column(Integer, ForeignKey("user.id", name="fk_task_assignee_id"), nullable=True, comment="任务负责人ID")
     
     # 时间戳
     created_at = Column(DateTime, default=func.now(), comment="创建时间")

@@ -11,10 +11,10 @@ class Comment(Base):
     content = Column(Text, nullable=False, comment="评论内容(Markdown格式)")
     
     # 作者
-    author_id = Column(Integer, ForeignKey("user.id"), nullable=False, comment="作者用户ID")
+    author_id = Column(Integer, ForeignKey("user.id", name="fk_comment_author_user"), nullable=False, comment="作者用户ID")
     
     # 关联对象 (任务)
-    task_id = Column(Integer, ForeignKey("task.id"), nullable=True, comment="关联任务ID")
+    task_id = Column(Integer, ForeignKey("task.id", name="fk_comment_task"), nullable=True, comment="关联任务ID")
     
     # 时间戳
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
