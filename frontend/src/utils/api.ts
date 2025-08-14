@@ -13,7 +13,7 @@ export interface RequestConfig extends RequestInit {
 }
 
 // 环境变量配置
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = '/api';
 
 // 认证错误处理函数
 export const authErrorHandler = {

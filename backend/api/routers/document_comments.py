@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/", response_model=ApiResponse[DocumentCommentResponse], summary="新增文档评论")
+@router.post("", response_model=ApiResponse[DocumentCommentResponse], summary="新增文档评论")
 async def add_comment(payload: DocumentCommentCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     try:
         svc = DocumentCommentService(db)

@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/", response_model=ApiResponse[CommentResponse], summary="创建评论")
+@router.post("", response_model=ApiResponse[CommentResponse], summary="创建评论")
 async def create_comment(
     comment: CommentCreate,
     db: Session = Depends(get_db),
@@ -37,7 +37,7 @@ async def create_comment(
             detail="创建评论失败"
         )
 
-@router.get("/", response_model=ApiResponse[List[CommentResponse]], summary="获取评论列表")
+@router.get("", response_model=ApiResponse[List[CommentResponse]], summary="获取评论列表")
 async def get_comments(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(20, ge=1, le=100, description="返回记录数"),

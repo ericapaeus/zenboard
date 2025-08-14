@@ -33,6 +33,7 @@ venv/
 __pycache__/
 uv.lock
 ./backend/zenboard.db
+data
 
 # Node.js 前端依赖
 node_modules/

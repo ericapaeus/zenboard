@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/", response_model=ApiResponse[TaskResponse], summary="创建任务")
+@router.post("", response_model=ApiResponse[TaskResponse], summary="创建任务")
 async def create_task(
     task: TaskCreate,
     db: Session = Depends(get_db),
@@ -39,7 +39,7 @@ async def create_task(
             detail="创建任务失败"
         )
 
-@router.get("/", response_model=ApiResponse[List[TaskResponse]], summary="获取任务列表")
+@router.get("", response_model=ApiResponse[List[TaskResponse]], summary="获取任务列表")
 async def get_tasks(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(20, ge=1, le=100, description="返回记录数"),

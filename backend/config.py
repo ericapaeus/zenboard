@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./zenboard.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/zenboard.db")
 
 # JWT Configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")

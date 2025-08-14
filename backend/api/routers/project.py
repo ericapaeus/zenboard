@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/", response_model=ApiResponse[ProjectResponse], summary="创建项目")
+@router.post("", response_model=ApiResponse[ProjectResponse], summary="创建项目")
 async def create_project(
     project: ProjectCreate,
     db: Session = Depends(get_db),
@@ -37,7 +37,7 @@ async def create_project(
             detail="创建项目失败"
         )
 
-@router.get("/", response_model=ApiResponse[List[ProjectResponse]], summary="获取用户项目列表")
+@router.get("", response_model=ApiResponse[List[ProjectResponse]], summary="获取用户项目列表")
 async def get_user_projects(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(20, ge=1, le=100, description="返回记录数"),

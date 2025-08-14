@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/", response_model=ApiResponse[DocumentResponse], summary="创建文档")
+@router.post("", response_model=ApiResponse[DocumentResponse], summary="创建文档")
 async def create_document(
     document: DocumentCreate,
     db: Session = Depends(get_db),
@@ -25,7 +25,7 @@ async def create_document(
         logger.error(f"创建文档失败: {str(e)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="创建文档失败")
 
-@router.get("/", response_model=ApiResponse[List[DocumentResponse]], summary="获取文档列表")
+@router.get("", response_model=ApiResponse[List[DocumentResponse]], summary="获取文档列表")
 async def get_documents(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),

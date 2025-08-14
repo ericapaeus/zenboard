@@ -9,7 +9,7 @@ from api.dependencies import get_current_user
 
 router = APIRouter(tags=["消息中心"]) 
 
-@router.post("/", response_model=ApiResponse[MessageResponse], summary="创建消息并投递给接收人")
+@router.post("", response_model=ApiResponse[MessageResponse], summary="创建消息并投递给接收人")
 async def create_message(payload: MessageCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     try:
         # 默认使用当前登录用户作为触发者

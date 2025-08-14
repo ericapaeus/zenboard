@@ -6,6 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 import models  # 只需这一行，确保所有模型都被注册到Base.metadata
 from database.base import Base  # 导入Base
+from config import DATABASE_URL # 导入 DATABASE_URL
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -40,7 +41,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = DATABASE_URL # 从 backend.config 获取 DATABASE_URL
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -63,6 +64,7 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        url=DATABASE_URL, # 从 backend.config 获取 DATABASE_URL
     )
 
     with connectable.connect() as connection:
