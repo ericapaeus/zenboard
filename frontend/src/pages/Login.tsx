@@ -48,20 +48,17 @@ export default function Login() {
     qrData, 
     loading: qrLoading, 
     error: qrError, 
-    fetchQRCode, 
-    refreshQRCode: refreshQRCodeHook 
+    fetchQRCode
   } = useQRCode();
   
   const { 
-    polling, 
     scanStatus, 
     isExpired, 
     error: pollingError, 
     startPolling, 
     resetStatus,
     setIsExpired,
-    setPolling,
-    stopPolling 
+    setPolling
   } = useQRCodePolling(qrData, handleScanSuccess);
   
   // 使用统一的登录流程 hook
@@ -153,7 +150,7 @@ export default function Login() {
       // 获取新的二维码
       await fetchQRCode();
       message.success("二维码已刷新");
-    } catch (error) {
+    } catch {
       message.error("刷新二维码失败，请重试");
     }
   };

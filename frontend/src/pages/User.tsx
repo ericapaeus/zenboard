@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Table, Button, Space, Tag, Form, Input, Select, Card, Row, Col, Spin, Modal } from 'antd';
+import { Table, Button, Space, Tag, Form, Input, Select, Card, Row, Col, Modal } from 'antd';
 import { SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { useUpdateUser, useDeleteUser, useAuthUsers, useApproveUser, useRejectUser } from '../hooks/useApi';
-import type { User } from '../hooks/useApi';
-
-const { Option } = Select;
+import { useUpdateUser, useDeleteUser, useAllAuthUsers, useApproveUser, useRejectUser } from '../hooks/useApi';
+import type { User } from '../types';
 
 // 使用 User 类型替代 Member 类型，保持一致性
 interface EditFormData {
@@ -38,9 +36,9 @@ const User: React.FC = () => {
   const [currentUser] = useState<User | null>(getCurrentUser());
 
   // 使用 hooks - 修复属性名
-  const { data: usersData, loading: usersLoading, error: usersError, refetch: refetchUsers } = useAuthUsers();
+  const { data: usersData, loading: usersLoading, error: usersError, refetch: refetchUsers } = useAllAuthUsers();
   const { updateUser, loading: updateLoading } = useUpdateUser();
-  const { deleteUser, loading: deleteLoading } = useDeleteUser();
+  const { deleteUser } = useDeleteUser();
   const { approveUser, loading: approveLoading } = useApproveUser();
   const { rejectUser, loading: rejectLoading } = useRejectUser();
 
@@ -268,7 +266,7 @@ const User: React.FC = () => {
   ];
 
   // 处理搜索
-  const handleSearch = useCallback((values: any) => {
+  const handleSearch = useCallback((values: { keyword?: string; status?: string }) => {
     setSearchKeyword(values.keyword || '');
     setStatusFilter(values.status || 'all');
   }, []);

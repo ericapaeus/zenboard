@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, EmailStr, field_validator
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_serializer
+from typing import Optional, Any, Dict
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 
@@ -17,6 +17,13 @@ def convert_to_beijing_time(dt: datetime) -> datetime:
     
     # 转换为北京时间
     return dt.astimezone(BEIJING_TIMEZONE)
+
+def format_datetime_for_display(dt: datetime) -> str:
+    """格式化datetime为显示字符串"""
+    if dt is None:
+        return None
+    beijing_dt = convert_to_beijing_time(dt)
+    return beijing_dt.strftime("%Y-%m-%d")
 
 class UserStatus(str, Enum):
     PENDING = "未审核"
@@ -59,9 +66,6 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        json_encoders = {
-            datetime: lambda v: convert_to_beijing_time(v).strftime("%Y-%m-%d %H:%M:%S")
-        }
 
     @field_validator('created_at', 'updated_at', 'hire_date', 'contract_expiry', mode='before')
     @classmethod
@@ -70,3 +74,23 @@ class UserResponse(BaseModel):
         if isinstance(v, datetime):
             return convert_to_beijing_time(v)
         return v
+
+    @model_serializer
+    def ser_model(self) -> Dict[str, Any]:
+        """自定义序列化方法，确保时间字段正确格式化"""
+        data = self.model_dump()
+        
+        # 格式化时间字段
+        if data.get('hire_date'):
+            data['hire_date'] = format_datetime_for_display(data['hire_date'])
+        
+        if data.get('contract_expiry'):
+            data['contract_expiry'] = format_datetime_for_display(data['contract_expiry'])
+        
+        if data.get('created_at'):
+            data['created_at'] = convert_to_beijing_time(data['created_at']).strftime("%Y-%m-%d %H:%M:%S")
+        
+        if data.get('updated_at'):
+            data['updated_at'] = convert_to_beijing_time(data['updated_at']).strftime("%Y-%m-%d %H:%M:%S")
+        
+        return data

@@ -1,20 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { message, Modal } from 'antd';
+import type { DependencyList } from 'react';
+import { message } from 'antd';
 import { authApi, userApi, teamApi, projectApi, taskApi, messageApi, uploadApi, documentApi, documentCommentApi, wechatAuthApi } from '@/services/api';
 import type { ApiResponse } from '@/utils/api';
 import type { 
   User, 
-  Project, 
-  Task, 
-  Contract, 
-  Document, 
-  DocumentComment,
-  Message,
   CreateDocumentData,
   UpdateDocumentData,
   AddCommentData,
   DocumentQueryParams,
-  UploadResponse,
   UseApiState,
   UseApiReturn,
   MessageCreateData,
@@ -44,10 +38,10 @@ export interface UpdateCommentData {
 
 // ==================== 通用 API Hook ====================
 
-// 通用 API Hook - React 19 兼容版本
+// 通用 API Hook - 修复无限循环版本
 export function useApi<T>(
   apiCall: () => Promise<ApiResponse<T>>,
-  dependencies: any[] = []
+  dependencies: DependencyList = []
 ): UseApiReturn<T> {
   const [state, setState] = useState<UseApiState<T>>({
     data: null,
@@ -55,26 +49,23 @@ export function useApi<T>(
     error: null,
   });
 
-  // 使用 useRef 来稳定 apiCall 引用，避免无限重新渲染
+  // 使用 useRef 来稳定 apiCall 引用
   const apiCallRef = useRef(apiCall);
-  
-  // 只在 apiCall 函数引用真正改变时更新
-  useEffect(() => {
-    apiCallRef.current = apiCall;
-  }, [apiCall]);
+  apiCallRef.current = apiCall;
 
   // 使用 useRef 来跟踪组件是否已卸载
   const isMountedRef = useRef(true);
 
+  // 使用 useRef 来存储上一次的依赖项，用于比较
+  const prevDepsRef = useRef<DependencyList>(dependencies);
+
   const fetchData = useCallback(async () => {
     try {
-      // 检查组件是否已卸载
       if (!isMountedRef.current) return;
       
       setState(prev => ({ ...prev, loading: true, error: null }));
       const response = await apiCallRef.current();
       
-      // 再次检查组件是否已卸载
       if (!isMountedRef.current) return;
       
       if (response.success) {
@@ -89,13 +80,11 @@ export function useApi<T>(
           loading: false,
           error: response.message || '请求失败',
         });
-        // 只在组件仍然挂载时显示错误消息
         if (isMountedRef.current) {
           message.error(response.message || '请求失败');
         }
       }
     } catch (error) {
-      // 再次检查组件是否已卸载
       if (!isMountedRef.current) return;
       
       const errorMessage = error instanceof Error ? error.message : '网络错误';
@@ -104,12 +93,11 @@ export function useApi<T>(
         loading: false,
         error: errorMessage,
       });
-      // 只在组件仍然挂载时显示错误消息
       if (isMountedRef.current) {
         message.error(errorMessage);
       }
     }
-  }, []); // 保持空依赖数组，因为使用 apiCallRef.current
+  }, []);
 
   const refetch = useCallback(() => {
     if (isMountedRef.current) {
@@ -123,36 +111,31 @@ export function useApi<T>(
     }
   }, []);
 
-  // React 19 兼容的 useEffect - 修复循环依赖
+  // 首次挂载时调用
   useEffect(() => {
     isMountedRef.current = true;
+    fetchData();
     
-    // 使用 Promise.resolve().then() 来确保异步操作在下一个微任务中执行
-    Promise.resolve().then(() => {
-      if (isMountedRef.current) {
-        fetchData();
-      }
-    });
-    
-    // 清理函数
     return () => {
       isMountedRef.current = false;
     };
-  }, []); // 移除 dependencies 依赖，避免循环
+  }, [fetchData]); // 包含 fetchData 依赖
 
-  // 单独处理 dependencies 变化时的重新获取
+  // 检查依赖项是否真的发生了变化
   useEffect(() => {
-    if (dependencies.length > 0 && isMountedRef.current) {
-      // 延迟执行，避免在依赖变化时立即触发
-      const timer = setTimeout(() => {
-        if (isMountedRef.current) {
-          fetchData();
-        }
-      }, 0);
-      
-      return () => clearTimeout(timer);
+    // 如果没有依赖项，不执行
+    if (dependencies.length === 0) return;
+    
+    // 比较依赖项是否真的发生了变化
+    const hasChanged = dependencies.some((dep, index) => {
+      return prevDepsRef.current[index] !== dep;
+    });
+    
+    if (hasChanged && isMountedRef.current) {
+      prevDepsRef.current = dependencies;
+      fetchData();
     }
-  }, dependencies);
+  }, [dependencies, fetchData]); // 包含所有依赖
 
   return {
     ...state,
@@ -286,9 +269,14 @@ export const useUsers = (params?: {
   );
 };
 
-// 使用authApi获取用户列表的Hook
+// 使用authApi获取用户列表的Hook（只返回已通过的用户）
 export const useAuthUsers = () => {
-  return useApi(() => authApi.getUsers());
+  return useApi(() => authApi.getUsers(false));
+};
+
+// 使用authApi获取所有用户列表的Hook（包括待审核、已拒绝等）
+export const useAllAuthUsers = () => {
+  return useApi(() => authApi.getUsers(true));
 };
 
 // 审批用户Hook
@@ -398,11 +386,12 @@ export const useTeamBoard = () => {
 // ==================== 任务管理 Hooks ====================
 
 export const useTasks = (params?: { skip?: number; limit?: number; project_id?: number; status_filter?: string; assignee_id?: number; }) => {
-  const stable = useRef(params);
-  stable.current = params;
+  // 如果没有参数，使用空数组作为依赖，确保只调用一次
+  const deps = params ? [params?.skip, params?.limit, params?.project_id, params?.status_filter, params?.assignee_id] : [];
+  
   return useApi(
-    () => taskApi.getTasks(stable.current),
-    [params?.skip, params?.limit, params?.project_id, params?.status_filter, params?.assignee_id]
+    () => taskApi.getTasks(params),
+    deps
   );
 };
 
@@ -481,7 +470,7 @@ export const useCreateUser = () => {
 export const useUpdateUser = () => {
   const [loading, setLoading] = useState(false);
 
-  const updateUser = async (id: string, userData: any) => {
+  const updateUser = async (id: string, userData: Partial<User>) => {
     setLoading(true);
     try {
       const response = await userApi.updateUser(id, userData);
@@ -615,7 +604,7 @@ export const useCreateTask = () => {
     parent_task_id?: number;
     start_date?: string;
     end_date?: string;
-    subtasks?: any[];
+    subtasks?: unknown[];
   }) => {
     setLoading(true);
     try {
@@ -674,7 +663,7 @@ export const useUpdateTask = () => {
     project_id?: number;
     start_date?: string;
     end_date?: string;
-    subtasks?: any[];
+    subtasks?: unknown[];
   }>) => {
     setLoading(true);
     try {
@@ -762,14 +751,10 @@ export const useUpdateProfile = () => {
         message.error(response.message || '更新失败');
         throw new Error(response.message);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("更新用户资料失败:", error);
-      
-      // 直接使用错误消息，不依赖response结构
-      const errorMessage = error.message || "更新失败，请重试";
+      const errorMessage = error instanceof Error ? error.message : "更新失败，请重试";
       console.log("显示错误消息:", errorMessage);
-      
-      // 直接抛出错误，让组件处理
       throw error;
     } finally {
       setLoading(false);
@@ -849,7 +834,7 @@ export const useCheckUserStatus = () => {
       } else {
         throw new Error(response.message || '获取用户信息失败');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("检查用户状态失败:", error);
       message.error("检查状态失败");
       throw error;
@@ -1211,14 +1196,9 @@ export const useQRCode = () => {
   const refreshQRCode = async () => {
     setQrData(null);
     setError(null);
-    try {
-      await fetchQRCode();
-      // 移除这里的 message.success，让调用方统一处理
-      return true;
-    } catch (error) {
-      // 错误提示已在 fetchQRCode 中处理
-      throw error;
-    }
+    await fetchQRCode();
+    // 移除这里的 message.success，让调用方统一处理
+    return true;
   };
 
   return { 

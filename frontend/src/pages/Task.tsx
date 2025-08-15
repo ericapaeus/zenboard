@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm, Row, Col, Space, Avatar, Divider, Pagination, DatePicker, Spin } from 'antd';
-import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, SearchOutlined, CheckCircleFilled, ClockCircleFilled, EditFilled, DownOutlined, RightOutlined } from '@ant-design/icons';
+import { UserOutlined, PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, ClockCircleOutlined, CheckCircleOutlined, SearchOutlined, DownOutlined, RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import type { Task, Subtask, TaskFlow } from '@/types';
+import type { Task, Subtask } from '@/types';
 import { useProjects, useAuthUsers, useCreateTask, useTasks, useCreateMessage, useDeleteTask, useUpdateTask, useCreateComment, useFetchTaskComments } from '@/hooks/useApi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -47,7 +47,7 @@ interface TaskProps {
   displayMode?: 'full' | 'pendingOnly';
 }
 
-const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
+const Task: React.FC<TaskProps> = () => {
   // 添加样式
   React.useEffect(() => {
     const style = document.createElement('style');
@@ -271,19 +271,36 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   const { deleteTask } = useDeleteTask();
   const { updateTask } = useUpdateTask();
 
-  const getUserName = (id?: number | null) => {
+  // 使用useCallback包装getUserName函数，避免每次渲染时重新创建
+  const getUserName = useCallback((id?: number | null) => {
     if (!id || !usersData) return '未分配';
     const u = usersData.find(u => u.id === id);
     return u?.name || `用户${id}`;
-  };
+  }, [usersData]);
 
-  const getProjectName = (id?: string | null) => {
+  const getProjectName = useCallback((id?: string | null) => {
     if (id === undefined || id === null || !projectsData) return undefined as unknown as string;
     const p = projectsData.find(p => p.id === id);
     return p?.name;
-  };
+  }, [projectsData]);
 
-  const mapApiTaskToUi = (t: any): Task => ({
+  // 使用useCallback包装mapApiTaskToUi函数
+  const mapApiTaskToUi = useCallback((t: {
+    id: number;
+    title: string;
+    content?: string;
+    assignee_id?: number;
+    original_assignee_id?: number;
+    start_date?: string;
+    end_date?: string;
+    progress?: number;
+    project_id?: string | number;
+    priority?: 'low' | 'medium' | 'high';
+    subtasks?: Subtask[];
+    completion_notes?: string;
+    creator_id?: number;
+    created_at?: string;
+  }): Task => ({
     id: String(t.id),
     title: t.title,
     content: t.content || '',  // 使用content字段
@@ -302,11 +319,26 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     // 添加原始ID字段，用于编辑表单
     assignee_id: t.assignee_id,
     project_id: t.project_id ? Number(t.project_id) : undefined, // 确保是数字类型
-  });
+  }), [getUserName, getProjectName]);
 
   React.useEffect(() => {
     if (apiTasks) {
-      const mapped = (apiTasks as any[]).map(mapApiTaskToUi);
+      const mapped = (apiTasks as unknown as Array<{
+        id: number;
+        title: string;
+        content?: string;
+        assignee_id?: number;
+        original_assignee_id?: number;
+        start_date?: string;
+        end_date?: string;
+        progress?: number;
+        project_id?: string | number;
+        priority?: 'low' | 'medium' | 'high';
+        subtasks?: Subtask[];
+        completion_notes?: string;
+        creator_id?: number;
+        created_at?: string;
+      }>).map(mapApiTaskToUi);
       // 按照ID倒序排序，最新创建的任务在上面
       const sortedTasks = mapped.sort((a, b) => {
         const aId = parseInt(a.id);
@@ -316,7 +348,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
       setTasks(sortedTasks);
       setFilteredTasks(sortedTasks); // 同步更新过滤后的任务
     }
-  }, [apiTasks, usersData, projectsData]);
+  }, [apiTasks, mapApiTaskToUi]);
 
   // 监听filteredTasks变化，用于调试
   React.useEffect(() => {
@@ -333,7 +365,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   }, [usersData, searchForm]);
 
   // 检查当前用户是否有权限编辑或删除任务
-  const canUserEditTask = (task: Task): boolean => {
+  const canUserEditTask = useCallback((task: Task): boolean => {
     const currentUserId = getCurrentUserId();
     if (!currentUserId) return false;
     
@@ -342,12 +374,12 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     
     // 任务创建人可以编辑和删除（通过createdBy字段查找用户ID）
     if (task.createdBy && usersData) {
-      const creatorUser = usersData.find((u: any) => u.name === task.createdBy);
+      const creatorUser = usersData.find((u) => u.name === task.createdBy);
       if (creatorUser && creatorUser.id === currentUserId) return true;
     }
     
     return false;
-  };
+  }, [usersData]);
 
   // 生成所有可能的处理人选项（包括任务负责人和子任务处理人）
   const getAllAssignees = useMemo(() => {
@@ -374,10 +406,10 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     
     // 转换为数组并排序
     return Array.from(assignees).sort();
-  }, [tasks, usersData]);
+  }, [tasks, getUserName]);
 
   const mockUsers = getAllAssignees;
-  const mockProjects = (projectsData || []).map(p => p.name);
+  // const mockProjects = (projectsData || []).map(p => p.name);
 
   const getPriorityTag = (priority: Task['priority']) => {
     switch (priority) {
@@ -400,13 +432,13 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     return new Date(dateString).toLocaleString('zh-CN');
   };
 
-  const showTaskDetails = (task: Task) => {
-    setSelectedTask(task);
-    setIsDetailsModalVisible(true);
-    setShowAddSubtaskForm(false);
-    // 加载任务评论
-    loadTaskComments(task.id);
-  };
+  // const showTaskDetails = (task: Task) => {
+  //   setSelectedTask(task);
+  //   setIsDetailsModalVisible(true);
+  //   setShowAddSubtaskForm(false);
+  //   // 加载任务评论
+  //   loadTaskComments(task.id);
+  // };
 
   const handleDetailsModalCancel = () => {
     setIsDetailsModalVisible(false);
@@ -461,7 +493,11 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
 
   // 已删除"处理任务/流转"相关逻辑
 
-  const handleAddSubtask = (values: any) => {
+  const handleAddSubtask = (values: {
+    title: string;
+    content: string;
+    assignee_id: number;
+  }) => {
     if (selectedTask) {
       const newSubtask: Subtask = {
         id: `s${Date.now()}`,
@@ -559,8 +595,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             recipient_user_ids: Array.from(recipientIds)
           });
         }
-      } catch (e) {
-        console.error('创建子任务添加通知失败：', e);
+      } catch (error) {
+        console.error('创建子任务添加通知失败：', error);
       }
       
       message.success('子任务添加成功！');
@@ -653,8 +689,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               recipient_user_ids: Array.from(recipientIds)
             });
           }
-        } catch (e) {
-          console.error('创建子任务删除通知失败：', e);
+        } catch (error) {
+          console.error('创建子任务删除通知失败：', error);
         }
       }
       
@@ -662,10 +698,39 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
     }
   };
 
-  const handleCreateTask = async (values: any) => {
+  const handleCreateTask = async (values: {
+    title: string;
+    content: string;
+    priority: 'low' | 'medium' | 'high';
+    assignee_id: number;
+    startDate: dayjs.Dayjs | null;
+    endDate: dayjs.Dayjs | null;
+    project_id?: number;
+    subtasks?: Array<{
+      id: string;
+      title: string;
+      content: string;
+      assignee_id: number;
+    }>;
+  }) => {
     try {
       // 处理创建任务的数据
-      const createData: any = {
+      const createData: {
+        title: string;
+        content: string;
+        priority: 'low' | 'medium' | 'high';
+        assignee_id: number;
+        parent_task_id?: undefined;
+        start_date?: string;
+        end_date?: string;
+        project_id?: number;
+        subtasks: Array<{
+          id: string;
+          title: string;
+          content: string;
+          assignee_id: number;
+        }>;
+      } = {
         title: values.title,
         content: values.content,
         priority: values.priority,
@@ -690,14 +755,14 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         
         // 1. 任务负责人
         if (values.assignee_id) {
-          recipientIds.add(Number(values.assignee_id));
+          recipientIds.add(values.assignee_id);
         }
         
         // 2. 所有子任务处理人
         if (values.subtasks && values.subtasks.length > 0) {
-          values.subtasks.forEach((subtask: any) => {
+          values.subtasks.forEach((subtask) => {
             if (subtask.assignee_id) {
-              recipientIds.add(Number(subtask.assignee_id));
+              recipientIds.add(subtask.assignee_id);
             }
           });
         }
@@ -749,24 +814,39 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             recipient_user_ids: Array.from(recipientIds)
           });
         }
-      } catch (e) {
-        console.error('创建任务通知失败：', e);
+      } catch (error) {
+        console.error('创建任务通知失败：', error);
       }
       
       message.success('任务创建成功！');
       handleCreateModalCancel();
       refetchTasks();
       return created;
-    } catch (e) {
+    } catch (error) {
       // 已在 hook 内提示
+      console.error('创建任务失败:', error);
     }
   };
 
-  const handleEditTask = async (values: any) => {
+  const handleEditTask = async (values: {
+    title: string;
+    content: string;
+    priority: 'low' | 'medium' | 'high';
+    assignee_id: number;
+    startDate: dayjs.Dayjs | null;
+    endDate: dayjs.Dayjs | null;
+    project_id?: number;
+    subtasks?: Array<{
+      id: string;
+      title: string;
+      content: string;
+      assignee_id: number;
+    }>;
+  }) => {
     if (selectedTask) {
       try {
         // 处理子任务数据，确保包含所有必要字段
-        const processedSubtasks = (values.subtasks || []).map((subtask: any, index: number) => {
+        const processedSubtasks = (values.subtasks || []).map((subtask, index) => {
           // 如果是现有子任务，保留原始ID和创建时间
           const existingSubtask = selectedTask.subtasks.find(s => s.title === subtask.title);
           return {
@@ -779,18 +859,33 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
         });
 
         // 处理日期格式
-        const processedValues: any = {
+        const processedValues: {
+          title: string;
+          content: string;
+          priority: 'low' | 'medium' | 'high';
+          assignee_id: number;
+          start_date?: string;
+          end_date?: string;
+          project_id?: number;
+          subtasks: Array<{
+            id: string;
+            title: string;
+            content: string;
+            assignee_id: number;
+            created_at: string;
+          }>;
+        } = {
           title: values.title,
           content: values.content, // 直接使用 content 字段
           priority: values.priority,
           assignee_id: values.assignee_id,
-          start_date: values.startDate ? values.startDate.format('YYYY-MM-DD') : values.startDate,
-          end_date: values.endDate ? values.endDate.format('YYYY-MM-DD') : values.endDate,
+          start_date: values.startDate ? values.startDate.format('YYYY-MM-DD') : undefined,
+          end_date: values.endDate ? values.endDate.format('YYYY-MM-DD') : undefined,
           subtasks: processedSubtasks,
         };
         
         // 只有当 project_id 有值时才传递
-        if (values.project_id !== undefined && values.project_id !== null && values.project_id !== '') {
+        if (values.project_id !== undefined && values.project_id !== null) {
           processedValues.project_id = values.project_id;
         }
         
@@ -807,28 +902,28 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
           
           // 1. 原任务负责人
           if (selectedTask.assignee_id) {
-            recipientIds.add(Number(selectedTask.assignee_id));
+            recipientIds.add(selectedTask.assignee_id);
           }
           
           // 2. 新任务负责人（如果发生变化）
           if (values.assignee_id && values.assignee_id !== selectedTask.assignee_id) {
-            recipientIds.add(Number(values.assignee_id));
+            recipientIds.add(values.assignee_id);
           }
           
           // 3. 所有子任务处理人（包括原有的和新增的）
           if (processedSubtasks && processedSubtasks.length > 0) {
-            processedSubtasks.forEach((subtask: any) => {
+            processedSubtasks.forEach((subtask) => {
               if (subtask.assignee_id) {
-                recipientIds.add(Number(subtask.assignee_id));
+                recipientIds.add(subtask.assignee_id);
               }
             });
           }
           
           // 4. 原有子任务处理人（如果被移除或修改）
           if (selectedTask.subtasks && selectedTask.subtasks.length > 0) {
-            selectedTask.subtasks.forEach((subtask: any) => {
+            selectedTask.subtasks.forEach((subtask) => {
               if (subtask.assignee_id) {
-                recipientIds.add(Number(subtask.assignee_id));
+                recipientIds.add(subtask.assignee_id);
               }
             });
           }
@@ -864,7 +959,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
             }
             
             // 子任务变化信息
-            let subtaskChanges: string[] = [];
+            const subtaskChanges: string[] = [];
             if (processedSubtasks && processedSubtasks.length > 0) {
               const oldSubtasksCount = selectedTask.subtasks.length;
               const newSubtasksCount = processedSubtasks.length;
@@ -878,7 +973,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               }
               
               // 检测子任务处理人变化
-              processedSubtasks.forEach((newSubtask: any) => {
+              processedSubtasks.forEach((newSubtask) => {
                 const oldSubtask = selectedTask.subtasks.find(s => s.title === newSubtask.title);
                 if (oldSubtask && oldSubtask.assignee_id !== newSubtask.assignee_id) {
                   const oldSubtaskAssignee = getUserName(oldSubtask.assignee_id);
@@ -921,8 +1016,8 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               recipient_user_ids: Array.from(recipientIds)
             });
           }
-        } catch (e) {
-          console.error('创建任务更新通知失败：', e);
+        } catch (error) {
+          console.error('创建任务更新通知失败：', error);
         }
         
         // 刷新任务列表
@@ -960,7 +1055,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
           
           // 2. 所有子任务处理人
           if (taskToDelete.subtasks && taskToDelete.subtasks.length > 0) {
-            taskToDelete.subtasks.forEach((subtask: any) => {
+            taskToDelete.subtasks.forEach((subtask) => {
               if (subtask.assignee_id) {
                 recipientIds.add(Number(subtask.assignee_id));
               }
@@ -1013,21 +1108,25 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               recipient_user_ids: Array.from(recipientIds)
             });
           }
-        } catch (e) {
-          console.error('创建任务删除通知失败：', e);
+        } catch (error) {
+          console.error('创建任务删除通知失败：', error);
         }
       }
       
       message.success('任务删除成功！');
       handleDetailsModalCancel();
       refetchTasks();
-    } catch (e) {
+    } catch (error) {
       // 已在 hook 内提示
+      console.error('删除任务失败:', error);
     }
   };
 
   // 搜索和筛选功能
-  const handleSearch = (values: any) => {
+  const handleSearch = (values: {
+    keyword?: string;
+    member?: string;
+  }) => {
     console.log('搜索参数:', values); // 调试信息
     let filtered = [...tasks];
     
@@ -1083,9 +1182,9 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   };
 
   // 根据当前标签页过滤任务
-  const getTasksByStatus = (_status: any) => {
-    return tasks;
-  };
+  // const getTasksByStatus = (_status: string) => {
+  //   return tasks;
+  // };
 
   // 初始化筛选结果
   React.useEffect(() => {
@@ -1099,96 +1198,14 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
   };
 
   const currentTabTasks = getCurrentTabTasks();
-  const paginatedTasks = currentTabTasks.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  // const paginatedTasks = currentTabTasks.slice(
+  //   (currentPage - 1) * pageSize,
+  //   currentPage * pageSize
+  // );
 
-  const totalPages = Math.ceil(currentTabTasks.length / pageSize);
+  // const totalPages = Math.ceil(currentTabTasks.length / pageSize);
 
-  const renderTaskCard = (task: Task) => (
-    <Col xs={24} key={task.id}>
-      <Card
-        hoverable
-        className="h-full shadow-sm"
-        style={{ borderTop: `4px solid ${task.priority === 'high' ? '#ff4d4f' : task.priority === 'medium' ? '#faad14' : '#52c41a'}` }}
-        actions={
-          canUserEditTask(task) ? [
-            <Button
-              key="edit"
-              type="link"
-              icon={<EditOutlined />}
-              onClick={() => handleEditModalOpen(task)}
-            >
-              编辑
-            </Button>,
-            <Popconfirm
-              key="delete"
-              title="确定要删除此任务吗？"
-              onConfirm={() => handleDeleteTask(task.id)}
-              okText="是"
-              cancelText="否"
-            >
-              <Button
-                type="link"
-                danger
-                icon={<DeleteOutlined />}
-              >
-                删除
-              </Button>
-            </Popconfirm>
-          ] : []
-        }
-      >
-        <div className="mb-4">
-          <div className="flex justify-between items-start mb-2">
-            <Title level={4} className="m-0 flex-1 mr-2">{task.title}</Title>
-            <Space>
-              {getPriorityTag(task.priority)}
-            </Space>
-          </div>
-          
-          <Paragraph className="text-gray-600 mb-3" ellipsis={{ rows: 2 }}>
-            {task.content}
-          </Paragraph>
-
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <div className="flex items-center gap-2">
-                <UserOutlined className="text-gray-400" />
-                <Text type="secondary">任务负责人: {task.currentAssignee}</Text>
-              </div>
-            </Col>
-            
-            <Col xs={24} sm={8}>
-              <div className="flex items-center gap-2">
-                <CalendarOutlined className="text-gray-400" />
-                <Text type="secondary">
-                  {formatDate(task.startDate)} - {formatDate(task.endDate)}
-                </Text>
-              </div>
-            </Col>
-
-            <Col xs={24} sm={8}>
-              <div className="flex items-center gap-2">
-                <ClockCircleOutlined className="text-gray-400" />
-                <Text type="secondary">项目: {task.project || '未指定'}</Text>
-              </div>
-            </Col>
-          </Row>
-
-          <Divider className="my-3" />
-
-              {task.subtasks.length > 0 && (
-            <div className="mt-2 flex items-center gap-2">
-                  <CheckCircleOutlined className="text-gray-400" />
-                  <Text type="secondary">子任务: {task.subtasks.length} 个</Text>
-            </div>
-          )}
-        </div>
-      </Card>
-    </Col>
-  );
+  // const renderTaskCard = (task: Task) => (
 
   const renderExpandableTaskList = () => (
     <List
@@ -1354,7 +1371,14 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                   dataSource={taskComments[task.id] || []}
                   locale={{ emptyText: '暂无评论' }}
                   loading={fetchCommentsLoading}
-                  renderItem={(c: any) => (
+                  renderItem={(c: {
+                    id: number;
+                    author_id: number;
+                    author_name?: string;
+                    author_avatar?: string;
+                    content: string;
+                    created_at: string;
+                  }) => (
                       <List.Item>
                       <List.Item.Meta
                         avatar={<Avatar size="small" icon={<UserOutlined />} />}
@@ -1568,7 +1592,14 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
               dataSource={taskComments[selectedTask.id] || []}
               locale={{ emptyText: '暂无评论' }}
               loading={fetchCommentsLoading}
-              renderItem={(c: any) => (
+              renderItem={(c: {
+                id: number;
+                author_id: number;
+                author_name?: string;
+                author_avatar?: string;
+                content: string;
+                created_at: string;
+              }) => (
                     <List.Item>
                   <List.Item.Meta
                     avatar={<Avatar size="small" icon={<UserOutlined />} />}
@@ -1837,7 +1868,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                 </Button>
               </div>
               <Form.List name="subtasks">
-                {(fields, { add, remove }) => (
+                {(fields, { remove }) => (
                   <>
                     {fields.map(({ key, name, ...restField }) => (
                       <div key={key} className="border rounded p-3 mb-2 bg-white">
@@ -2033,7 +2064,7 @@ const Task: React.FC<TaskProps> = ({ displayMode = 'full' }) => {
                 </div>
                 
                 <Form.List name="subtasks">
-                  {(fields, { add, remove }) => (
+                  {(fields, { remove }) => (
                     <>
                       {fields.map(({ key, name, ...restField }) => (
                         <div key={key} className="border rounded p-3 mb-3 bg-white">

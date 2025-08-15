@@ -1,13 +1,10 @@
-import React, { useState } from 'react';
-import { Row, Col, Card, Typography, List, Space, Badge, Avatar, Button, Modal, Form, Input, Select, Tag, Skeleton, Tooltip, Divider, message, Tabs, Progress, Pagination, DatePicker } from 'antd';
-import { CheckCircleTwoTone, NotificationTwoTone, FileTextOutlined, SearchOutlined, PlusOutlined, FilterOutlined, ReloadOutlined, ClockCircleFilled, CheckCircleFilled, UserOutlined, CalendarOutlined, ClockCircleOutlined, EditOutlined, SendOutlined, DownOutlined, RightOutlined, DeleteOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import React from 'react';
+import { Row, Col, Card, Typography, List, Space, Badge, Avatar, Button, Modal, Form, Input, Select, Tag, Skeleton, message } from 'antd';
+import { CheckCircleTwoTone, NotificationTwoTone, FileTextOutlined, SearchOutlined,  ReloadOutlined } from '@ant-design/icons';
 import { messageApi } from '@/services/api';
 import type { UserNotification } from '@/types';
-import dayjs from 'dayjs';
 
-const { Text, Title, Paragraph } = Typography;
-const { Option } = Select;
-const { TextArea } = Input;
+const { Text } = Typography;
 
 // 动态导入Task组件
 const TaskComponent = React.lazy(() => import('./Task'));
@@ -23,7 +20,6 @@ export default function Dashboard() {
   // 搜索弹窗
   const [searchVisible, setSearchVisible] = React.useState(false);
   const [searchForm] = Form.useForm();
-  const [searchLoading, setSearchLoading] = React.useState(false);
 
   // 消息中心数据
   const [loadingMessages, setLoadingMessages] = React.useState(true);
@@ -39,7 +35,7 @@ export default function Dashboard() {
       ]);
       if (listRes.success) setMessages(listRes.data || []);
       if (countRes.success) setUnreadCount(countRes.data || 0);
-    } catch (err) {
+    } catch {
       message.error('消息加载失败，请稍后重试');
     } finally {
       setLoadingMessages(false);
@@ -87,7 +83,7 @@ export default function Dashboard() {
       } else {
         message.error('标记已读失败');
       }
-    } catch (err) {
+    } catch {
       message.error('标记已读失败，请稍后重试');
     }
   };
@@ -101,7 +97,7 @@ export default function Dashboard() {
       } else {
         message.error('全部已读操作失败');
       }
-    } catch (err) {
+    } catch {
       message.error('全部已读失败，请稍后重试');
     }
   };
@@ -435,22 +431,22 @@ export default function Dashboard() {
         open={searchVisible}
         onCancel={() => setSearchVisible(false)}
         onOk={() => searchForm.submit()}
-        confirmLoading={searchLoading}
+        confirmLoading={false}
         className="search-modal"
         width={500}
         okText="搜索"
         cancelText="取消"
         footer={[
-          <Button key="reset" onClick={() => searchForm.resetFields()} disabled={searchLoading}>
+          <Button key="reset" onClick={() => searchForm.resetFields()} disabled={false}>
             重置
           </Button>,
-          <Button key="cancel" onClick={() => setSearchVisible(false)} disabled={searchLoading}>
+          <Button key="cancel" onClick={() => setSearchVisible(false)} disabled={false}>
             取消
           </Button>,
           <Button 
             key="submit" 
             type="primary" 
-            loading={searchLoading}
+            loading={false}
             onClick={() => searchForm.submit()}
           >
             搜索

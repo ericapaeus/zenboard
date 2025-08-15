@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Form, Input, Button, DatePicker, message, Card, Avatar } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';

@@ -1,11 +1,21 @@
-import React from 'react';
-import { Card, Row, Col, Button, Form, Input, Switch, Select, Space } from 'antd';
-import { SettingOutlined, SaveOutlined } from '@ant-design/icons';
+
+import { Card, Row, Col, Button, Form, Input, Switch, Select } from 'antd';
+import { SaveOutlined } from '@ant-design/icons';
+
+// 定义系统配置的类型
+interface SystemConfigValues {
+  siteName: string;
+  siteDescription: string;
+  enableNotifications: boolean;
+  enableEmailNotifications: boolean;
+  language: string;
+  timezone: string;
+}
 
 export default function SystemConfig() {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<SystemConfigValues>();
 
-  const handleSubmit = (values: any) => {
+  const handleSubmit = (values: SystemConfigValues) => {
     console.log('系统配置:', values);
   };
 

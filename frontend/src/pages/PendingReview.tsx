@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { Card, Result, Button, Spin, message } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -6,22 +6,30 @@ import { useCheckUserStatus, useCheckFirstUser } from '@/hooks/useApi';
 
 export default function PendingReview() {
   const navigate = useNavigate();
-  const { checkUserStatus, loading, userInfo, setUserInfo } = useCheckUserStatus();
+  const { checkUserStatus, loading } = useCheckUserStatus();
   const { checkFirstUser, loading: checkFirstUserLoading, error: checkFirstUserError } = useCheckFirstUser();
 
+  // 使用 useRef 来存储函数引用，避免依赖循环
+  const checkUserStatusRef = useRef(checkUserStatus);
+  const navigateRef = useRef(navigate);
+  
+  // 更新 ref 值
+  checkUserStatusRef.current = checkUserStatus;
+  navigateRef.current = navigate;
+
   // 检查用户状态
-  const handleCheckUserStatus = async () => {
+  const handleCheckUserStatus = useCallback(async () => {
     try {
-      const user = await checkUserStatus();
+      const user = await checkUserStatusRef.current();
       
       // 根据状态进行不同处理
       if (user.status === "已通过") {
         // 不显示消息，直接跳转，让 ProtectedRoute 处理
-        navigate("/");
+        navigateRef.current("/");
         return;
       } else if (user.status === "已拒绝") {
         message.error("审核未通过，请联系管理员");
-        navigate("/complete-profile");
+        navigateRef.current("/complete-profile");
         return;
       }
       // 如果是"待审核"状态，继续显示等待页面
@@ -29,10 +37,10 @@ export default function PendingReview() {
       // 错误处理已经在 hook 中完成
       console.error("检查用户状态失败:", error);
     }
-  };
+  }, []); // 空依赖数组，因为使用 ref 来访问最新值
 
   // 检查是否为第一个用户
-  const handleCheckFirstUser = async () => {
+  const handleCheckFirstUser = useCallback(async () => {
     try {
       const result = await checkFirstUser();
       if (result?.isFirstUser) {
@@ -60,7 +68,7 @@ export default function PendingReview() {
     } catch (error) {
       console.error("检查第一个用户失败:", error);
     }
-  };
+  }, [checkFirstUser, handleCheckUserStatus]);
 
   useEffect(() => {
     // 先检查是否为第一个用户
@@ -70,7 +78,7 @@ export default function PendingReview() {
     // 每30秒检查一次状态
     const interval = setInterval(handleCheckUserStatus, 30000);
     return () => clearInterval(interval);
-  }, [navigate]);
+  }, [handleCheckFirstUser, handleCheckUserStatus]);
 
   const handleRefresh = () => {
     handleCheckUserStatus();
@@ -127,26 +135,6 @@ export default function PendingReview() {
                 <li>• 审核不通过需要重新提交资料</li>
               </ul>
             </div>
-
-            {userInfo && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-gray-800 mb-2">当前状态：</h3>
-                <div className="space-y-2 text-sm">
-                  <p><span className="font-medium">姓名：</span>{userInfo.name || '未填写'}</p>
-                  <p><span className="font-medium">手机号：</span>{userInfo.phone || '未填写'}</p>
-                  <p><span className="font-medium">邮箱：</span>{userInfo.email || '未填写'}</p>
-                  <p><span className="font-medium">审核状态：</span>
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      userInfo.status === "待审核" ? "bg-yellow-100 text-yellow-800" :
-                      userInfo.status === "已通过" ? "bg-green-100 text-green-800" :
-                      "bg-red-100 text-red-800"
-                    }`}>
-                      {userInfo.status}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            )}
 
             <div className="bg-yellow-50 p-4 rounded-lg">
               <h3 className="font-semibold text-yellow-800 mb-2">温馨提示：</h3>

@@ -239,13 +239,10 @@ class TaskService:
         if "end_date" in payload:
             db_task.end_date = payload["end_date"]
         if "priority" in payload:
-            pr = str(payload["priority"]).lower()
-            if pr == "low":
-                db_task.priority = ModelTaskPriority.LOW
-            elif pr == "high":
-                db_task.priority = ModelTaskPriority.HIGH
-            else:
-                db_task.priority = ModelTaskPriority.MEDIUM
+            logger.info(f"处理优先级更新，接收到的优先级: {payload['priority']}")
+            # 直接使用枚举值，不需要字符串转换
+            db_task.priority = payload["priority"]
+            logger.info(f"设置后的优先级: {db_task.priority}")
         # 处理子任务更新
         if "subtasks" in payload:
             logger.info(f"处理子任务更新，原始子任务: {db_task.subtasks}")

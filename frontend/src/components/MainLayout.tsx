@@ -1,10 +1,9 @@
 import Sidebar from "./Sidebar";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Breadcrumb, Avatar, Dropdown, Space, ConfigProvider, theme, Button, Tooltip } from "antd";
-import { UserOutlined, SettingOutlined, LogoutOutlined, TranslationOutlined, FullscreenOutlined, FullscreenExitOutlined, MenuUnfoldOutlined, MenuFoldOutlined } from "@ant-design/icons";
+import { UserOutlined, LogoutOutlined, TranslationOutlined, FullscreenOutlined, FullscreenExitOutlined, MenuUnfoldOutlined, MenuFoldOutlined } from "@ant-design/icons";
 import { useState, useCallback, useEffect } from "react";
 import { DesktopOutlined, SunOutlined, MoonOutlined } from '@ant-design/icons';
-import { routes, type RouteConfig } from '../routes';
 import { appConfig } from '@/config/app';
 
 // 简化的路由标签映射
@@ -63,38 +62,6 @@ function getBreadcrumbItems(pathname: string) {
   return items;
 }
 
-// 获取标签页标签和图标
-function getTabLabelByPath(path: string): React.ReactNode {
-  const label = routeLabels[path];
-  if (!label) return '未知页面';
-  
-  // 从路由配置中获取图标
-  let icon = null;
-  
-  // 查找路由配置
-  const findRouteIcon = (routes: RouteConfig[], targetPath: string): React.ReactNode | null => {
-    for (const route of routes) {
-      if (route.path === targetPath) {
-        return route.icon || null;
-      }
-      if (route.children) {
-        const found = findRouteIcon(route.children, targetPath);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-  
-  icon = findRouteIcon(routes, path);
-  
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      {icon && <span className="text-gray-500">{icon}</span>}
-      <span>{label}</span>
-    </span>
-  );
-}
-
 export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -114,7 +81,7 @@ export default function MainLayout() {
     const handler = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
     mediaQuery.addEventListener?.('change', handler);
     return () => mediaQuery.removeEventListener?.('change', handler);
-  }, []);
+  }, [mediaQuery]);
   const isDark = themeMode === 'dark' || (themeMode === 'system' && systemPrefersDark);
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');

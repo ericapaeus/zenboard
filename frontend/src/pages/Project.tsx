@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Typography, Button, Modal, Form, Input, Select, Avatar, Tag, Space, Row, Col, Statistic, Pagination, Dropdown, message } from 'antd';
-import { PlusOutlined, UserOutlined, CheckCircleOutlined, ClockCircleOutlined, TeamOutlined, SearchOutlined, MoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, CheckCircleOutlined, ClockCircleOutlined, SearchOutlined, MoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { generateProjectColor } from '@/utils/colorGenerator';
 // 导入 API hooks
 import { 
@@ -12,8 +12,7 @@ import {
   useCreateMessage
 } from '@/hooks/useApi';
 import type { 
-  Project, 
-  User, 
+  User,
   ProjectWithMembers, 
   CreateProjectData, 
   UpdateProjectData 
@@ -64,8 +63,8 @@ const Projects: React.FC = () => {
   const { data: usersData, loading: usersLoading } = useAuthUsers();
   const { createProject, loading: createLoading } = useCreateProject();
   const { updateProject, loading: updateLoading } = useUpdateProject();
-  const { deleteProject, loading: deleteLoading } = useDeleteProject();
-  const { createMessage, loading: messageLoading } = useCreateMessage();
+  const { deleteProject } = useDeleteProject();
+  const { createMessage } = useCreateMessage();
 
   // 转换后端数据为前端格式
   const projects = React.useMemo(() => {
@@ -73,12 +72,25 @@ const Projects: React.FC = () => {
     
     console.log('原始项目数据:', projectsData);
     
-    return projectsData.map((project: any) => {
+    // 定义原始项目数据的类型
+    type RawProjectData = {
+      id: string;
+      name: string;
+      description: string;
+      status: 'active' | 'archived';
+      created_by: string;
+      created_at: string;
+      updated_at: string;
+      user_ids: number[];
+      task_count: number;
+      subtask_count: number;
+    };
+    
+    return (projectsData as RawProjectData[]).map((project: RawProjectData): ProjectWithMembers => {
       console.log('处理项目:', {
         id: project.id,
         name: project.name,
-        created_by: project.created_by,
-        created_by_id: project.created_by_id
+        created_by: project.created_by
       });
       
       return {
@@ -131,7 +143,7 @@ const Projects: React.FC = () => {
     
     // 如果项目有创建者信息，通过created_by字段查找用户ID
     if (project.created_by && usersData) {
-      const creatorUser = usersData.find((u: any) => u.name === project.created_by);
+      const creatorUser = usersData.find((u: User) => u.name === project.created_by);
       console.log('查找创建者用户:', {
         createdBy: project.created_by,
         foundUser: creatorUser,
@@ -148,7 +160,7 @@ const Projects: React.FC = () => {
   };
 
   // 搜索和筛选功能
-  const handleSearch = (values: any) => {
+  const handleSearch = (values: { keyword?: string; member?: string }) => {
     let filtered = [...projects];
     
     // 关键词搜索
@@ -156,15 +168,18 @@ const Projects: React.FC = () => {
       const keyword = values.keyword.toLowerCase();
       filtered = filtered.filter(project => 
         project.name.toLowerCase().includes(keyword) ||
-        project.description.toLowerCase().includes(keyword)
+        (project.description && project.description.toLowerCase().includes(keyword))
       );
     }
     
     // 成员筛选
     if (values.member && values.member !== 'all') {
-      filtered = filtered.filter(project => 
-        project.user_ids?.includes(parseInt(values.member))
-      );
+      const memberId = parseInt(values.member);
+      if (!isNaN(memberId)) {
+        filtered = filtered.filter(project => 
+          project.user_ids?.includes(memberId)
+        );
+      }
     }
     
     setFilteredProjects(filtered);
@@ -209,7 +224,7 @@ const Projects: React.FC = () => {
     editForm.resetFields();
   };
 
-  const handleCreateProject = async (values: any) => {
+  const handleCreateProject = async (values: { name: string; description: string; user_ids?: number[] }) => {
     try {
       const createData: CreateProjectData = {
         name: values.name,
@@ -242,12 +257,13 @@ const Projects: React.FC = () => {
       } catch (e) {
         console.error('创建项目消息失败：', e);
       }
-    } catch (error: any) {
-      message.error(`创建失败: ${error?.message || '未知错误'}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      message.error(`创建失败: ${errorMessage}`);
     }
   };
 
-  const handleEditProject = async (values: any) => {
+  const handleEditProject = async (values: { name: string; description: string; user_ids?: number[] }) => {
     if (selectedProject) {
       try {
         const updateData: UpdateProjectData = {
@@ -281,8 +297,9 @@ const Projects: React.FC = () => {
         } catch (e) {
           console.error('创建项目更新消息失败：', e);
         }
-      } catch (error: any) {
-        message.error(`更新失败: ${error?.message || '未知错误'}`);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        message.error(`更新失败: ${errorMessage}`);
       }
     }
   };
@@ -325,8 +342,9 @@ const Projects: React.FC = () => {
               console.error('创建项目删除消息失败：', e);
             }
           }
-        } catch (error: any) {
-          message.error(`删除失败: ${error?.message || '未知错误'}`);
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : '未知错误';
+          message.error(`删除失败: ${errorMessage}`);
         }
       },
     });
@@ -378,8 +396,9 @@ const Projects: React.FC = () => {
           console.error('创建项目归档消息失败：', e);
         }
       }
-    } catch (error: any) {
-      message.error(`归档失败: ${error?.message || '未知错误'}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      message.error(`归档失败: ${errorMessage}`);
     }
   };
 
@@ -411,8 +430,9 @@ const Projects: React.FC = () => {
           console.error('创建项目激活消息失败：', e);
         }
       }
-    } catch (error: any) {
-      message.error(`激活失败: ${error?.message || '未知错误'}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      message.error(`激活失败: ${errorMessage}`);
     }
   };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Typography, Tag, Modal, Button, Input, Select, List, Form, message, Popconfirm, Space } from 'antd';
-import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ClockCircleFilled, CheckCircleFilled } from '@ant-design/icons';
+import { UserOutlined, InfoCircleOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useParams } from 'react-router-dom'; // Import useParams
 
 const { Title, Text, Paragraph } = Typography;
@@ -158,17 +158,6 @@ const ProjectTasks: React.FC = () => {
     message.success(`成员 ${memberToDelete} 已删除！`);
   };
 
-  const getStatusTag = (status: any) => {
-    switch (status) {
-      case 'pending':
-        return <Tag color="processing" icon={<ClockCircleFilled />}>待处理</Tag>;
-      case 'completed':
-        return <Tag color="success" icon={<CheckCircleFilled />}>已完成</Tag>;
-      default:
-        return <Tag>未知</Tag>;
-    }
-  };
-
   const showTaskDetails = (task: Task) => {
     setSelectedTask(task);
     setIsDetailsModalVisible(true);
@@ -247,19 +236,19 @@ const ProjectTasks: React.FC = () => {
         const values = await completionForm.validateFields();
         const updatedAllTasks = allTasks.map(task =>
           task.id === selectedTask.id
-            ? { ...task, status: 'done' as 'done' }
+            ? { ...task, status: 'done' as const }
             : task
         );
         setAllTasks(updatedAllTasks);
         message.success(`任务 "${selectedTask.title}" 已提交！完成方案: ${values.completionDetails}`);
         handleDetailsModalCancel();
-      } catch (errorInfo) {
+      } catch {
         message.error('请填写任务完成方案及情况！');
       }
     }
   };
 
-  const handleCreateTask = async (values: any) => {
+  const handleCreateTask = async (values: { title: string; assignee: string; description: string; fullContent: string; project: string; projectId: string }) => {
     const newTask: Task = {
       id: `t${Date.now()}`,
       title: values.title,
@@ -276,7 +265,7 @@ const ProjectTasks: React.FC = () => {
     handleCreateModalCancel();
   };
 
-  const handleEditTask = async (values: any) => {
+  const handleEditTask = async (values: Partial<Task>) => {
     if (selectedTask) {
       const updatedAllTasks = allTasks.map(task =>
         task.id === selectedTask.id

@@ -1,5 +1,5 @@
 // API 响应类型定义
-export type ApiResponse<T = any> = {
+export type ApiResponse<T = unknown> = {
   success: boolean;
   code: number;
   message: string;
@@ -232,21 +232,21 @@ export const api = {
   get: <T>(endpoint: string, config?: RequestConfig) =>
     apiRequest<T>(endpoint, { ...config, method: 'GET' }),
 
-  post: <T>(endpoint: string, data?: any, config?: RequestConfig) =>
+  post: <T>(endpoint: string, data?: unknown, config?: RequestConfig) =>
     apiRequest<T>(endpoint, {
       ...config,
       method: 'POST',
       body: data ? (data instanceof FormData ? data : JSON.stringify(data)) : undefined,
     }),
 
-  put: <T>(endpoint: string, data?: any, config?: RequestConfig) =>
+  put: <T>(endpoint: string, data?: unknown, config?: RequestConfig) =>
     apiRequest<T>(endpoint, {
       ...config,
       method: 'PUT',
       body: data ? (data instanceof FormData ? data : JSON.stringify(data)) : undefined,
     }),
 
-  patch: <T>(endpoint: string, data?: any, config?: RequestConfig) =>
+  patch: <T>(endpoint: string, data?: unknown, config?: RequestConfig) =>
     apiRequest<T>(endpoint, {
       ...config,
       method: 'PATCH',

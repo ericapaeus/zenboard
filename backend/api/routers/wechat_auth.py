@@ -13,6 +13,7 @@ from models.user import User
 from api.dependencies import get_current_user
 from services.user_service import UserService
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 
 router = APIRouter(tags=["微信认证"])
 logger = logging.getLogger(__name__)
@@ -336,19 +337,50 @@ async def check_first_user(
 
 @router.get("/user", response_model=ApiResponse[list], summary="获取用户列表")
 async def get_users(
+    include_all: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    获取用户列表，所有认证用户都可以访问，只返回已通过的用户
+    获取用户列表
+    - include_all=False: 只返回已通过的用户（默认）
+    - include_all=True: 返回所有用户（包括待审核、已拒绝等）
     """
     try:
-        # 查询所有状态为"已通过"的用户
-        users = db.query(User).filter(User.status == "已通过").order_by(User.id.desc()).all()
+        # 根据include_all参数决定查询条件
+        if include_all:
+            # 返回所有用户
+            users = db.query(User).order_by(User.id.desc()).all()
+        else:
+            # 只返回已通过的用户
+            users = db.query(User).filter(User.status == "已通过").order_by(User.id.desc()).all()
         
         # 转换为响应格式
         user_list = []
         for user in users:
+            # 转换时间为北京时间
+            hire_date = None
+            contract_expiry = None
+            created_at = None
+            updated_at = None
+            
+            if user.hire_date:
+                # 假设数据库中的时间是UTC时间，转换为北京时间
+                beijing_hire_date = user.hire_date.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=8)))
+                hire_date = beijing_hire_date.strftime("%Y-%m-%d")
+            
+            if user.contract_expiry:
+                beijing_contract_expiry = user.contract_expiry.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=8)))
+                contract_expiry = beijing_contract_expiry.strftime("%Y-%m-%d")
+            
+            if user.created_at:
+                beijing_created_at = user.created_at.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=8)))
+                created_at = beijing_created_at.strftime("%Y-%m-%d %H:%M:%S")
+            
+            if user.updated_at:
+                beijing_updated_at = user.updated_at.replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=8)))
+                updated_at = beijing_updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            
             user_list.append({
                 "id": user.id,
                 "name": user.name,
@@ -357,10 +389,10 @@ async def get_users(
                 "role": user.role,
                 "status": user.status,
                 "avatar": user.avatar,
-                "hire_date": user.hire_date.strftime("%Y-%m-%d") if user.hire_date else None,
-                "contract_expiry": user.contract_expiry.strftime("%Y-%m-%d") if user.contract_expiry else None,
-                "created_at": user.created_at.strftime("%Y-%m-%d %H:%M:%S") if user.created_at else None,
-                "updated_at": user.updated_at.strftime("%Y-%m-%d %H:%M:%S") if user.updated_at else None
+                "hire_date": hire_date,
+                "contract_expiry": contract_expiry,
+                "created_at": created_at,
+                "updated_at": updated_at
             })
         
         return ApiResponse(

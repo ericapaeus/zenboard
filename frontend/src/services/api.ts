@@ -73,8 +73,13 @@ export const authApi = {
   },
 
   // 获取用户列表
-  getUsers: (): Promise<ApiResponse<User[]>> => {
-    return api.get('/auth/wechat/user');
+  getUsers: (include_all?: boolean): Promise<ApiResponse<User[]>> => {
+    const searchParams = new URLSearchParams();
+    if (include_all) {
+      searchParams.append('include_all', 'true');
+    }
+    const query = searchParams.toString();
+    return api.get(`/auth/wechat/user${query ? `?${query}` : ''}`);
   },
 
   // 审批用户
@@ -296,13 +301,13 @@ export const taskApi = {
     parent_task_id?: number;
     start_date?: string;
     end_date?: string;
-    subtasks?: any[];
+    subtasks?: unknown[];
   }): Promise<ApiResponse<Task>> => {
     return api.post('/task', taskData);
   },
 
   // 更新任务
-  updateTask: (id: number, taskData: Partial<{ title: string; content: string; priority: 'low' | 'medium' | 'high'; assignee_id?: number; project_id?: number; parent_task_id?: number; status?: 'pending' | 'completed'; start_date?: string; end_date?: string; subtasks?: any[]; }>): Promise<ApiResponse<Task>> => {
+  updateTask: (id: number, taskData: Partial<{ title: string; content: string; priority: 'low' | 'medium' | 'high'; assignee_id?: number; project_id?: number; parent_task_id?: number; status?: 'pending' | 'completed'; start_date?: string; end_date?: string; subtasks?: unknown[]; }>): Promise<ApiResponse<Task>> => {
     return api.put(`/task/${id}`, taskData);
   },
 
@@ -385,7 +390,7 @@ export const messageApi = {
     type?: string;
     read?: boolean;
   }): Promise<ApiResponse<{
-    messages: any[];
+    messages: unknown[];
     total: number;
     page: number;
     limit: number;

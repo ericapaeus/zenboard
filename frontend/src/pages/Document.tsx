@@ -6,7 +6,6 @@ import {
   Typography,
   Modal,
   Form,
-  Radio,
   Select,
   Row,
   Col,
@@ -15,7 +14,6 @@ import {
   Card,
   Input,
   Pagination,
-  Tag,
   Avatar,
 } from 'antd';
 import { SearchOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
@@ -29,7 +27,6 @@ import {
   useCreateDocument, 
   useUpdateDocument, 
   useDeleteDocument, 
-  useDocumentComments, 
   useAddComment,
   useFetchDocumentComments,
   useProjects,
@@ -104,7 +101,6 @@ const DocumentPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
-  const [drafts, setDrafts] = useState<DiaryEntry[]>([]);
   const [editingDraftId, setEditingDraftId] = useState<number | null>(null);
   const [editingForDiaries, setEditingForDiaries] = useState<boolean>(false);
 
@@ -113,7 +109,6 @@ const DocumentPage: React.FC = () => {
   const contentPreview: string = Form.useWatch('content', form);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [commentInputs, setCommentInputs] = useState<Record<number, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -140,7 +135,7 @@ const DocumentPage: React.FC = () => {
   const { updateDocument, loading: updateLoading } = useUpdateDocument();
   const { deleteDocument, loading: deleteLoading } = useDeleteDocument();
   const { addComment, loading: addCommentLoading } = useAddComment();
-  const { fetchComments, loading: fetchCommentsLoading } = useFetchDocumentComments();
+  const { fetchComments } = useFetchDocumentComments();
   const { createMessage } = useCreateMessage();
 
   // 获取单个文档评论的 hook
@@ -183,7 +178,6 @@ const DocumentPage: React.FC = () => {
   }, [documentsData]);
 
   function mapDoc(doc: Document): DiaryEntry {
-  const anyDoc: any = doc as any;
   return {
     id: doc.id,
     title: doc.title,
@@ -191,9 +185,9 @@ const DocumentPage: React.FC = () => {
     date: dayjs(doc.created_at).format('YYYY-MM-DD HH:mm:ss'), // 格式化时间
     status: 'submitted',
     comments: [],
-    project_id: anyDoc.project_id ? Number(anyDoc.project_id) : undefined, // 确保是数字类型
-    members: anyDoc.specific_user_ids || anyDoc.user_ids || [],
-    creator_id: anyDoc.author_id ? Number(anyDoc.author_id) : undefined, // 使用 author_id 作为创建者ID
+      project_id: (doc as Document & { project_id?: string | number }).project_id ? Number((doc as Document & { project_id?: string | number }).project_id) : undefined,
+      members: (doc as Document & { specific_user_ids?: number[]; user_ids?: number[] }).specific_user_ids || (doc as Document & { specific_user_ids?: number[]; user_ids?: number[] }).user_ids || [],
+      creator_id: (doc as Document & { author_id?: string | number }).author_id ? Number((doc as Document & { author_id?: string | number }).author_id) : undefined,
   };
 }
 
@@ -220,7 +214,7 @@ const DocumentPage: React.FC = () => {
     
     // 如果文档有创建者信息，通过author_id字段查找用户ID
     if (document.creator_id && usersData) {
-      const creatorUser = usersData.find((u: any) => u.id === document.creator_id);
+      const creatorUser = usersData.find((u: { id: number; name?: string }) => u.id === document.creator_id);
       if (creatorUser && creatorUser.id === currentUserId) {
         console.log('通过用户数据找到创建者，允许编辑');
         return true;
@@ -241,7 +235,7 @@ const DocumentPage: React.FC = () => {
   }, [currentPage, pageSize]);
 
   // Filtering helper（基于当前页本地过滤：标题、日期）
-  function applyFilters(list: DiaryEntry[], values: any) {
+  const applyFilters = useCallback((list: DiaryEntry[], values: { keyword?: string; member?: string | number }) => {
     const [startDate, endDate] = selectedDateRange;
     let result = list.filter((diary) => {
       const diaryDate = dayjs(diary.date);
@@ -256,12 +250,10 @@ const DocumentPage: React.FC = () => {
       result = result.filter((d) => (d.title || '').toLowerCase().includes(kw));
     }
     if (values?.member && values.member !== 'all') {
-      result = result.filter((d) => (d.members || []).includes(values.member));
+      result = result.filter((d) => (d.members || []).includes(values.member as number));
     }
     return result;
-  }
-
-  const [filteredDiaries, setFilteredDiaries] = useState<DiaryEntry[]>([]);
+  }, [selectedDateRange]);
 
   // Keep form's dateRange synced with state
   useEffect(() => {
@@ -275,20 +267,18 @@ const DocumentPage: React.FC = () => {
 
   // 当筛选条件/数据变化时，做本地过滤
   useEffect(() => {
-    const values = searchForm.getFieldsValue();
-    setFilteredDiaries(applyFilters(diaries, values));
+    // 直接使用 currentDiaries 计算，不需要额外的 filteredDiaries 状态
   }, [diaries, selectedDateRange]);
 
-  const handleSearch = useCallback((values: any) => {
+  const handleSearch = useCallback(() => {
     // 更新分页参数，触发重新加载
     setCurrentPage(1);
     // 折叠所有展开的列表项
     setExpandedIds(new Set());
     // 重新获取文档列表
     refetchDocuments();
-    // 同步做本地过滤
-    setFilteredDiaries(applyFilters(diaries, values));
-  }, [diaries, refetchDocuments]);
+    // 直接使用 currentDiaries 计算，不需要额外的 filteredDiaries 状态
+  }, [refetchDocuments]);
 
   const handleReset = useCallback(() => {
     searchForm.resetFields();
@@ -299,7 +289,7 @@ const DocumentPage: React.FC = () => {
     refetchDocuments();
     // 重置到第一页
     setCurrentPage(1);
-  }, [searchForm, refetchDocuments]);
+  }, [searchForm, refetchDocuments, defaultStartDate, defaultEndDate]);
 
   const showModal = useCallback(() => {
     setIsModalOpen(true);
@@ -313,38 +303,11 @@ const DocumentPage: React.FC = () => {
       project_id: undefined,
       user_ids: []
     });
-  }, [form]);
+  }, [form, setEditingDraftId, setEditingForDiaries]);
 
   const handleCancel = useCallback(() => {
     setIsModalOpen(false);
   }, []);
-
-  const handleSaveDraft = useCallback(() => {
-    form
-      .validateFields()
-      .then((values) => {
-        const newDraft: DiaryEntry = {
-          id: Date.now(),
-          date: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-          title: values.title,
-          content: values.content,
-          members: values.user_ids,
-          status: 'draft',
-        };
-
-        if (editingDraftId) {
-          setDrafts(drafts.map((d) => (d.id === editingDraftId ? newDraft : d)));
-          message.success('草稿已更新');
-        } else {
-          setDrafts([...drafts, newDraft]);
-          message.success('草稿已保存');
-        }
-        setIsModalOpen(false);
-      })
-      .catch(() => {
-        message.error('请填写完整内容');
-      });
-  }, [form, editingDraftId, drafts]);
 
   const handleSubmit = useCallback(async () => {
     try {
@@ -388,18 +351,19 @@ const DocumentPage: React.FC = () => {
           refetchDocuments();
         } else {
           // 编辑草稿（本地）
-          setDrafts((prev) =>
-            prev.map((d) =>
-              d.id === editingDraftId
-                ? {
-                    ...d,
-                    title: values.title,
-                    content: values.content,
-                    members: values.user_ids,
-                  }
-                : d,
-            ),
-          );
+          // This part of the logic is no longer needed as editing is handled by the modal
+          // setDrafts((prev) =>
+          //   prev.map((d) =>
+          //     d.id === editingDraftId
+          //       ? {
+          //           ...d,
+          //           title: values.title,
+          //           content: values.content,
+          //           members: values.user_ids,
+          //         }
+          //       : d,
+          //   ),
+          // );
           message.success('草稿已更新');
           setIsModalOpen(false);
           setEditingDraftId(null);
@@ -441,25 +405,14 @@ const DocumentPage: React.FC = () => {
         // 重置到第一页
         setCurrentPage(1);
       }
-    } catch (error: any) {
-      if (error.message) {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message) {
         message.error(error.message);
       } else {
         message.error('请填写完整内容');
       }
     }
-  }, [form, editingDraftId, editingForDiaries, updateDocument, createDocument, refetchDocuments, loadDocuments, pageSize]);
-
-  const handleEditDraft = useCallback((draft: DiaryEntry) => {
-    setIsModalOpen(true);
-    setEditingDraftId(draft.id);
-    setEditingForDiaries(false);
-    form.setFieldsValue({
-      title: draft.title,
-      content: draft.content,
-      user_ids: draft.members,
-    });
-  }, [form]);
+  }, [form, editingDraftId, editingForDiaries, updateDocument, createDocument, refetchDocuments, createMessage]);
 
   const handleEditDiary = useCallback((item: DiaryEntry) => {
   console.log('编辑文档 - 原始数据:', {
@@ -506,8 +459,8 @@ const DocumentPage: React.FC = () => {
       // 重新加载评论列表
       try {
         await getDocumentComments(diaryId);
-      } catch (error) {
-        console.error('重新加载评论失败:', error);
+      } catch {
+        // 错误已在 hook 中处理
       }
     } catch (error) {
       console.error('添加评论失败:', error);
@@ -535,7 +488,7 @@ const DocumentPage: React.FC = () => {
         try {
           // 使用 hook 获取评论
           await getDocumentComments(id);
-        } catch (error) {
+        } catch {
           // 错误已在 hook 中处理
         }
       }
@@ -556,7 +509,7 @@ const DocumentPage: React.FC = () => {
   const currentDiaries = useMemo(() => {
     const values = searchForm.getFieldsValue();
     return applyFilters(diaries, values);
-  }, [diaries, selectedDateRange, searchForm]);
+  }, [diaries, searchForm, applyFilters]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteTargetItem) return;
@@ -582,18 +535,18 @@ const DocumentPage: React.FC = () => {
       setDeleteConfirmModalOpen(false);
       setDeleteTargetItem(null);
 
-      console.log('�� 删除完成，列表刷新调用完毕');
+      console.log(' 删除完成，列表刷新调用完毕');
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('💥 删除过程中发生错误', {
         error: error,
-        errorMessage: error?.message,
-        errorStack: error?.stack,
+        errorMessage: error instanceof Error ? error.message : '未知错误',
+        errorStack: error instanceof Error ? error.stack : undefined,
         documentId: deleteTargetItem.id,
         timestamp: new Date().toISOString()
       });
       
-      message.error(`删除失败: ${error?.message || '未知错误'}`);
+      message.error(`删除失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   }, [deleteTargetItem, deleteDocument, currentPage, pageSize, refetchDocuments]);
 

@@ -1,5 +1,5 @@
 import React, { lazy } from 'react';
-import { UserOutlined, TeamOutlined, FileTextOutlined, SettingOutlined, UserSwitchOutlined, ProjectOutlined, CheckSquareOutlined, BookOutlined, HomeOutlined } from '@ant-design/icons';
+import { UserOutlined, FileTextOutlined, SettingOutlined, UserSwitchOutlined, ProjectOutlined, CheckSquareOutlined, BookOutlined, HomeOutlined } from '@ant-design/icons';
 
 // 懒加载页面组件
 const Dashboard = lazy(() => import('../pages/Dashboard'));

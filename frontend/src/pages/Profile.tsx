@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import  { useState, useEffect, useCallback } from 'react';
 import { 
   Card, 
   Form, 
@@ -49,7 +49,7 @@ export default function Profile() {
   });
 
   // 获取用户信息
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     setLoading(true);
     try {
       const response = await authApi.getCurrentUser();
@@ -84,7 +84,7 @@ export default function Profile() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [form]); // 添加 form 作为依赖
 
   // 更新用户信息
   const updateUserProfile = async (values: ProfileData & { hire_date?: dayjs.Dayjs; contract_expiry?: dayjs.Dayjs }) => {
@@ -191,7 +191,7 @@ export default function Profile() {
   // 组件加载时获取用户信息
   useEffect(() => {
     fetchUserProfile();
-  }, []);
+  }, [fetchUserProfile]); // 依赖项中添加 fetchUserProfile
 
   // 处理表单提交
   const handleSubmit = async (values: ProfileData & { hire_date?: dayjs.Dayjs; contract_expiry?: dayjs.Dayjs }) => {
